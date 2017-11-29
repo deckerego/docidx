@@ -19,7 +19,7 @@ public class FileEntry {
     }
 
     public FileEntry(Path file) {
-        this(file.getParent().toAbsolutePath().toString(), file.toString(), file.toFile().lastModified());
+        this(file.getParent().toAbsolutePath().toString(), file.getFileName().toString(), file.toFile().lastModified());
     }
 
     public String getParentPath() { return this.parentPath; }

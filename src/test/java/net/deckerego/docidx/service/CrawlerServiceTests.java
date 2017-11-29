@@ -14,6 +14,6 @@ public class CrawlerServiceTests {
 
     @Test
     public void directoryStreamCollector() {
-        crawlSvc.crawl();
+        crawlSvc.crawl("src/test");
     }
 }
