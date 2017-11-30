@@ -9,10 +9,11 @@ import java.io.IOException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -32,29 +33,63 @@ public class CrawlerService {
         }
     }
 
-    private List<FileEntry> getDocuments(Path path) {
+    private Map<String, FileEntry> getDocuments(Path path) {
         List<FileEntry> files = List.of();
-
-        return files;
+        //TODO Fetch documents from repository, until then pretend there were no results
+        return files.stream().collect(Collectors.toMap(e -> e.getFileName(), Function.identity()));
     }
 
-    private List<Path> getFiles(Path path) {
-        List<Path> files = List.of();
+    private Map<String, Path> getFiles(Path path) {
+        Map<String, Path> files = new HashMap<>();
 
-        try(Stream<Path> fsStream = Files.find(path, 1, (p, a) -> a.isRegularFile())) {
-            files = fsStream.collect(Collectors.toList());
-        } catch(IOException e) {
+        try (Stream<Path> fsStream = Files.find(path, 1, (p, a) -> a.isRegularFile())) {
+            files = fsStream.collect(Collectors.toMap(p -> p.getFileName().toString(), Function.identity()));
+        } catch (IOException e) {
             LOG.error(String.format("Fatal exception when finding files under %s", path), e);
         }
 
-        LOG.info(String.format("Found %d files for %s", files.size(), path.getFileName()));
+        LOG.debug(String.format("Found %d files for %s", files.size(), path.getFileName()));
         return files;
     }
 
-    private List<FileEntry> merge(List<FileEntry> entries, List<Path> paths) {
-        List<FileEntry> files = paths.stream().map(p -> new FileEntry(p)).collect(Collectors.toList());
+    private DocumentActions merge(Path parent, Map<String, FileEntry> documents, Map<String, Path> files) {
+        DocumentActions actions = new DocumentActions(parent);
 
-        return files;
+        actions.additions = files.keySet().stream()
+                .filter(f -> ! documents.containsKey(f))
+                .map(files::get).collect(Collectors.toSet());
+        LOG.debug(String.format("Found %d additions for %s", actions.additions.size(), parent.getFileName().toString()));
+
+        actions.updates = files.keySet().stream()
+                .filter(f -> documents.containsKey(f) && documents.get(f).getLastModified() < files.get(f).toFile().lastModified())
+                .map(files::get).collect(Collectors.toSet());
+        LOG.debug(String.format("Found %d updates for %s", actions.updates.size(), parent.getFileName().toString()));
+
+        actions.deletions = documents.keySet().stream()
+                .filter(f -> ! files.containsKey(f))
+                .map(documents::get).collect(Collectors.toSet());
+        LOG.debug(String.format("Found %d deletions for %s", actions.deletions.size(), parent.getFileName().toString()));
+
+        return actions;
+    }
+
+    private class DocumentActions {
+        public Path directory;
+        public Set<FileEntry> deletions;
+        public Set<Path> additions;
+        public Set<Path> updates;
+
+        public DocumentActions(Path directory) {
+            this.directory = directory;
+            this.deletions = new HashSet<>();
+            this.additions = new HashSet<>();
+            this.updates = new HashSet<>();
+        }
+
+        @Override
+        public String toString() {
+            return String.format("For %s\nAdditions: %s\nUpdates: %s\nDeletions: %s", directory.getFileName().toString(), additions, updates, deletions);
+        }
     }
 
     private class CrawlSubscriber implements Flow.Subscriber<Path> {
@@ -68,11 +103,11 @@ public class CrawlerService {
 
         @Override
         public void onNext(Path message) {
-            CompletableFuture<List<FileEntry>> futureDocuments = CompletableFuture.supplyAsync(() -> getDocuments(message));
-            CompletableFuture<List<Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(message));
-            CompletableFuture<List<FileEntry>> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(d, p));
+            CompletableFuture<Map<String, FileEntry>> futureDocuments = CompletableFuture.supplyAsync(() -> getDocuments(message));
+            CompletableFuture<Map<String, Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(message));
+            CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(message, d, p));
 
-            futureEntries.whenComplete((val, ex) -> LOG.info(val.toString()));
+            futureEntries.whenComplete((actions, ex) -> LOG.info(actions.toString()));
             subscription.request(1);
         }
 
