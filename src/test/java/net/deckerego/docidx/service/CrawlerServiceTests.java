@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
+import static org.assertj.core.api.Assertions.fail;
+
 @RunWith(SpringRunner.class)
 @SpringBootTest
 public class CrawlerServiceTests {
@@ -14,6 +16,11 @@ public class CrawlerServiceTests {
 
     @Test
     public void directoryStreamCollector() {
-        crawlSvc.crawl("src/test");
+        crawlSvc.crawl("tests");
+        try { //FIXME Because it's all background processing
+            Thread.sleep(3000);
+        } catch(InterruptedException e) {
+            fail("Error during hackish sleep");
+        }
     }
 }

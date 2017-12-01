@@ -3,6 +3,7 @@ package net.deckerego.docidx.service;
 import net.deckerego.docidx.model.FileEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -21,6 +22,9 @@ import java.util.stream.Stream;
 public class CrawlerService {
     private static final Logger LOG = LoggerFactory.getLogger(CrawlerService.class);
 
+    @Autowired
+    public TikaService tikaService;
+
     public void crawl(String rootPath) {
         SubmissionPublisher<Path> publisher = new SubmissionPublisher<>();
         publisher.subscribe(new CrawlSubscriber());
@@ -36,7 +40,7 @@ public class CrawlerService {
     private Map<String, FileEntry> getDocuments(Path path) {
         List<FileEntry> files = List.of();
         //TODO Fetch documents from repository, until then pretend there were no results
-        return files.stream().collect(Collectors.toMap(e -> e.getFileName(), Function.identity()));
+        return files.stream().collect(Collectors.toMap(e -> e.fileName, Function.identity()));
     }
 
     private Map<String, Path> getFiles(Path path) {
@@ -61,7 +65,7 @@ public class CrawlerService {
         LOG.debug(String.format("Found %d additions for %s", actions.additions.size(), parent.getFileName().toString()));
 
         actions.updates = files.keySet().stream()
-                .filter(f -> documents.containsKey(f) && documents.get(f).getLastModified() < files.get(f).toFile().lastModified())
+                .filter(f -> documents.containsKey(f) && documents.get(f).lastModified < files.get(f).toFile().lastModified())
                 .map(files::get).collect(Collectors.toSet());
         LOG.debug(String.format("Found %d updates for %s", actions.updates.size(), parent.getFileName().toString()));
 
@@ -88,7 +92,8 @@ public class CrawlerService {
 
         @Override
         public String toString() {
-            return String.format("For %s\nAdditions: %s\nUpdates: %s\nDeletions: %s", directory.getFileName().toString(), additions, updates, deletions);
+            return String.format("For %s\nAdditions: %s\nUpdates: %s\nDeletions: %s",
+                    directory.getFileName().toString(), additions, updates, deletions);
         }
     }
 
@@ -107,7 +112,9 @@ public class CrawlerService {
             CompletableFuture<Map<String, Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(message));
             CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(message, d, p));
 
-            futureEntries.whenComplete((actions, ex) -> LOG.info(actions.toString()));
+            futureEntries
+                    .whenComplete((actions, ex) -> tikaService.submit(actions.additions, e -> LOG.info(e.body)))
+                    .whenComplete((actions, ex) -> tikaService.submit(actions.updates, e -> LOG.info(e.body)));
             subscription.request(1);
         }
 
