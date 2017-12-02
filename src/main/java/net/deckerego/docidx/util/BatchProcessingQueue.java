@@ -26,7 +26,7 @@ public class BatchProcessingQueue<E> {
     public boolean offer(E element) {
         if(batchQueue.size() >= this.batchSize) {
             List<E> batch = new ArrayList<>(this.batchSize);
-            this.batchQueue.drainTo(batch);
+            this.batchQueue.drainTo(batch, batchSize);
             process(batch);
         }
 
@@ -45,7 +45,7 @@ public class BatchProcessingQueue<E> {
         @Override
         public void run() {
             List<E> batch = new ArrayList<>();
-            batchQueue.drainTo(batch);
+            batchQueue.drainTo(batch, batchSize);
             process(batch);
         }
     }

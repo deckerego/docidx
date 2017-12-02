@@ -18,7 +18,7 @@ public class CrawlerServiceTests {
     public void directoryStreamCollector() {
         crawlSvc.crawl("tests");
         try { //FIXME Because it's all background processing
-            Thread.sleep(3000);
+            Thread.sleep(5000);
         } catch(InterruptedException e) {
             fail("Error during hackish sleep");
         }
