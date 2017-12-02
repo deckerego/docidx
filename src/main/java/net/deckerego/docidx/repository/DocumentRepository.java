@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Repository;
 
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.util.List;
 
 @Repository
@@ -24,34 +26,25 @@ public class DocumentRepository {
     BatchProcessingQueue<FileEntry> updateBatchQueue;
     BatchProcessingQueue<FileEntry> deleteBatchQueue;
 
-    private BatchProcessingQueue<FileEntry> getUpdateBatchQueue() {
-        if(this.updateBatchQueue == null) {
-            this.updateBatchQueue = new BatchProcessingQueue<>(this::batchUpdate,
-                    elasticConfig.batchSize,
-                    elasticConfig.batchSize * 1000,
-                    elasticConfig.batchWaitMillis);
-        }
+    @PostConstruct
+    public void initQueues() {
+        this.updateBatchQueue = new BatchProcessingQueue<>(this::batchUpdate,
+                elasticConfig.batchSize,
+                elasticConfig.batchSize * 1000,
+                elasticConfig.batchWaitMillis);
 
-        return this.updateBatchQueue;
-    }
-
-    private BatchProcessingQueue<FileEntry> getDeleteBatchQueue() {
-        if(this.deleteBatchQueue == null) {
-            this.deleteBatchQueue = new BatchProcessingQueue<>(this::batchDelete,
-                    elasticConfig.batchSize,
-                    elasticConfig.batchSize * 1000,
-                    elasticConfig.batchWaitMillis);
-        }
-
-        return this.deleteBatchQueue;
+        this.deleteBatchQueue = new BatchProcessingQueue<>(this::batchDelete,
+                elasticConfig.batchSize,
+                elasticConfig.batchSize * 1000,
+                elasticConfig.batchWaitMillis);
     }
 
     public boolean createOrUpdate(FileEntry entry) {
-        return getUpdateBatchQueue().offer(entry);
+        return this.updateBatchQueue.offer(entry);
     }
 
     public boolean delete(FileEntry entry) {
-        return getDeleteBatchQueue().offer(entry);
+        return this.deleteBatchQueue.offer(entry);
     }
 
     public List<FileEntry> findAllByParent(String parent) {
@@ -66,5 +59,12 @@ public class DocumentRepository {
     private void batchDelete(List<FileEntry> entries) {
         LOG.info("Batch Deleting from ES:");
         LOG.info(entries.toString());
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        LOG.info("Initiating shutdown for DocumentRepository");
+        this.updateBatchQueue.shutdown();
+        this.deleteBatchQueue.shutdown();
     }
 }
