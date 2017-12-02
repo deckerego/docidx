@@ -19,6 +19,6 @@ public class TikaServiceTests {
 
     @Test
     public void submitFiles() {
-        tikaSvc.submit(List.of(FileSystems.getDefault().getPath("./src/README.md")), e -> assertThat(e).isNotNull());
+        tikaSvc.submit(List.of(FileSystems.getDefault().getPath("./README.md")), e -> assertThat(e).isNotNull());
     }
 }
