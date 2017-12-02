@@ -11,7 +11,7 @@ public class FileEntry {
 
     @Override
     public String toString() {
-        return String.format("FileEntry[ Parent: %s, Child %s, Last Modified %Tc ]",
+        return String.format("FileEntry[ Parent: %s, Last Modified %Tc ]",
                 this.fileName, new Date(this.lastModified));
     }
 }

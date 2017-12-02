@@ -1,6 +1,7 @@
 package net.deckerego.docidx.service;
 
 import net.deckerego.docidx.model.FileEntry;
+import net.deckerego.docidx.repository.DocumentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,9 @@ public class CrawlerService {
     @Autowired
     public TikaService tikaService;
 
+    @Autowired
+    public DocumentRepository docRepo;
+
     public void crawl(String rootPath) {
         SubmissionPublisher<Path> publisher = new SubmissionPublisher<>();
         publisher.subscribe(new CrawlSubscriber());
@@ -38,8 +42,7 @@ public class CrawlerService {
     }
 
     private Map<String, FileEntry> getDocuments(Path path) {
-        List<FileEntry> files = List.of();
-        //TODO Fetch documents from repository, until then pretend there were no results
+        List<FileEntry> files = this.docRepo.findAllByParent(path.toString());
         return files.stream().collect(Collectors.toMap(e -> e.fileName, Function.identity()));
     }
 
@@ -113,8 +116,9 @@ public class CrawlerService {
             CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(message, d, p));
 
             futureEntries
-                    .whenComplete((actions, ex) -> tikaService.submit(actions.additions, e -> LOG.info(e.body)))
-                    .whenComplete((actions, ex) -> tikaService.submit(actions.updates, e -> LOG.info(e.body)));
+                    .whenComplete((actions, ex) -> tikaService.submit(actions.additions, docRepo::createOrUpdate))
+                    .whenComplete((actions, ex) -> tikaService.submit(actions.updates, docRepo::createOrUpdate))
+                    .whenComplete((actions, ex) -> actions.deletions.forEach(docRepo::delete));
             subscription.request(1);
         }
 
