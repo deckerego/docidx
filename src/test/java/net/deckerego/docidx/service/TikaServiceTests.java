@@ -1,27 +1,24 @@
-package net.deckerego.docidx;
+package net.deckerego.docidx.service;
 
-import net.deckerego.docidx.service.CrawlerService;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import java.nio.file.Path;
+import java.nio.file.FileSystems;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.*;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
-public class DocIndexApplicationTests {
+public class TikaServiceTests {
     @Autowired
-    private CrawlerService crawlSvc;
+    private TikaService tikaSvc;
 
     @Test
-    public void directoryStreamCollector() {
-        List<Path> result = crawlSvc.crawl();
-
-        assertThat(result.size()).isGreaterThan(0);
+    public void submitFiles() {
+        tikaSvc.submit(List.of(FileSystems.getDefault().getPath("./src/README.md")), e -> assertThat(e).isNotNull());
     }
 }
