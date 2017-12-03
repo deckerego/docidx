@@ -28,10 +28,10 @@ services:
       - ELASTICSEARCH_HOST=es6_test_01
       - ELASTICSEARCH_PORT=9300
       - ELASTICSEARCH_CLUSTER=docmag-cluster
-      - DOCUMENT_ROOT=/usr/share/docmagui/docs
+      - DOCUMENT_ROOT=/usr/share/docidx/docs
     depends_on: [ elasticsearch ]
     volumes:
-      - ${DOCUMENT_HOST_DIR}:/usr/share/docmagui/docs:ro
+      - ${DOCUMENT_HOST_DIR}:/usr/share/docidx/docs:ro
     networks:
       - esnet
 
