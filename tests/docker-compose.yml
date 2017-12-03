@@ -1,0 +1,43 @@
+version: '3'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.0.0
+    container_name: es6_test_01
+    environment:
+      - bootstrap.memory_lock=true
+      - cluster.name=docmag-cluster
+      - xpack.security.enabled=false
+      - "discovery.type=single-node"
+      - "ES_JAVA_OPTS=-Xms800M -Xmx800M"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - 9300:9300
+      - 9200:9200
+    volumes:
+      - esdata01:/usr/share/elasticsearch/data
+    networks:
+      - esnet
+
+  docmagui:
+    image: deckerego/docidx
+    container_name: docidx
+    environment:
+      - ELASTICSEARCH_HOST=es6_test_01
+      - ELASTICSEARCH_PORT=9300
+      - ELASTICSEARCH_CLUSTER=docmag-cluster
+      - DOCUMENT_ROOT=/usr/share/docmagui/docs
+    depends_on: [ elasticsearch ]
+    volumes:
+      - ${DOCUMENT_HOST_DIR}:/usr/share/docmagui/docs:ro
+    networks:
+      - esnet
+
+volumes:
+  esdata01:
+    driver: local
+
+networks:
+  esnet:
