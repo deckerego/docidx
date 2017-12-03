@@ -38,6 +38,8 @@ public class CrawlerService {
             fsStream.forEach(file -> publisher.offer(file, (sub, msg) -> true));
         } catch(IOException e) {
             LOG.error(String.format("Fatal exception when finding dirs under %s", cwd), e);
+        } finally {
+            publisher.close();
         }
     }
 
