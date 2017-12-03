@@ -15,7 +15,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Flow;
 import java.util.concurrent.SubmissionPublisher;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -42,8 +41,6 @@ public class CrawlerService {
         } finally {
             publisher.close();
         }
-
-        LOG.debug(String.format("Finished crawling directories within %s", rootPath));
     }
 
     private Map<String, FileEntry> getDocuments(Path path) {
@@ -130,7 +127,6 @@ public class CrawlerService {
         @Override
         public void onComplete() {
             LOG.info("Completed CrawlSubscriber");
-            //TODO How to gracefully wait for things to exit?
         }
 
         @Override

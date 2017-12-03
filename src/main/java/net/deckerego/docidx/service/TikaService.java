@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
-import javax.annotation.PreDestroy;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -72,20 +71,6 @@ public class TikaService {
         LOG.debug(String.format("Submitting parse of %s", files));
         for (Path file : files)
             this.threadPool.execute(new TikaTask(file, callback));
-    }
-
-    @PreDestroy
-    public boolean shutdown() {
-        LOG.info("Initiating shutdown for TikaService");
-        try {
-            this.threadPool.shutdown();
-            boolean wait = this.threadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
-            LOG.debug("TikaService shut down");
-            return wait;
-        } catch(InterruptedException e) {
-            LOG.error("Interrupted while waiting for flush", e);
-            return false;
-        }
     }
 
     private class TikaTask implements Runnable {

@@ -10,7 +10,6 @@ import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.stereotype.Repository;
 
 import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.util.List;
 
 @Repository
@@ -59,12 +58,5 @@ public class DocumentRepository {
     private void batchDelete(List<FileEntry> entries) {
         LOG.info("Batch Deleting from ES:");
         LOG.info(entries.toString());
-    }
-
-    @PreDestroy
-    public void shutdown() {
-        LOG.info("Initiating shutdown for DocumentRepository");
-        this.updateBatchQueue.shutdown();
-        this.deleteBatchQueue.shutdown();
     }
 }
