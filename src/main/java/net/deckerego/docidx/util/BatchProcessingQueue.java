@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 public class BatchProcessingQueue<E> {
@@ -17,7 +18,7 @@ public class BatchProcessingQueue<E> {
     private final int batchSize;
     private final long purgeWaitMillis;
     private final Consumer<List<E>> callback;
-    //FIXME The purge timer is horribly broken still and totally not threadsafe
+    private final ReentrantReadWriteLock updateLock = new ReentrantReadWriteLock();
     private Timer purgeTimer;
 
     public BatchProcessingQueue(Consumer<List<E>> callback, int batchSize, int capacity, long purgeWaitMillis) {
@@ -28,10 +29,18 @@ public class BatchProcessingQueue<E> {
     }
 
     public boolean offer(E element) {
+        this.updateLock.readLock().lock();
         if(this.purgeTimer == null) {
+            this.updateLock.readLock().unlock();
+            this.updateLock.writeLock().lock();
+
             LOG.debug(String.format("Scheduling purge timer for %d", this.purgeWaitMillis));
             this.purgeTimer = new Timer();
             this.purgeTimer.schedule(new PurgeTask(), this.purgeWaitMillis);
+
+            this.updateLock.writeLock().unlock();
+        } else {
+            this.updateLock.readLock().unlock();
         }
 
         if(this.batchQueue.size() >= this.batchSize) {
@@ -42,11 +51,13 @@ public class BatchProcessingQueue<E> {
         return this.batchQueue.offer(element);
     }
 
-    public synchronized void purge() {
+    public void purge() {
+        this.updateLock.writeLock().lock();
         LOG.debug("Purging current batch queue");
         this.purgeTimer.cancel();
         this.purgeTimer.purge();
         this.purgeTimer = null;
+        this.updateLock.writeLock().unlock();
 
         List<E> batch = new ArrayList<>(this.batchSize);
         this.batchQueue.drainTo(batch);
