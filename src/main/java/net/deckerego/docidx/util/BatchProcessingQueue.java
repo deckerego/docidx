@@ -17,6 +17,7 @@ public class BatchProcessingQueue<E> {
     private final int batchSize;
     private final long purgeWaitMillis;
     private final Consumer<List<E>> callback;
+    //FIXME The purge timer is horribly broken still and totally not threadsafe
     private Timer purgeTimer;
 
     public BatchProcessingQueue(Consumer<List<E>> callback, int batchSize, int capacity, long purgeWaitMillis) {
@@ -42,6 +43,7 @@ public class BatchProcessingQueue<E> {
     }
 
     public void purge() {
+        LOG.debug("Purging current batch queue");
         this.purgeTimer.cancel();
         this.purgeTimer.purge();
         this.purgeTimer = null;
