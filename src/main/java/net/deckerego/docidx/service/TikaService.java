@@ -97,7 +97,7 @@ public class TikaService {
             entry.parentPath = file.getParent().toString();
             entry.fileName = file.getFileName().toString();
             entry.lastModified = file.toFile().lastModified();
-            entry.id = DigestUtils.md5Hex(entry.parentPath);
+            entry.id = DigestUtils.md5Hex(file.toString());
 
             try {
                 ContentHandler body = new BodyContentHandler();

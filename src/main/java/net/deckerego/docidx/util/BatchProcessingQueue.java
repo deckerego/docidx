@@ -34,7 +34,7 @@ public class BatchProcessingQueue<E> {
             this.purgeTimer.schedule(new PurgeTask(), this.purgeWaitMillis);
         }
 
-        if(batchQueue.size() >= this.batchSize) {
+        if(this.batchQueue.size() >= this.batchSize) {
             LOG.debug(String.format("Purging %d elements with buffer size %d", this.batchQueue.size(), this.batchSize));
             purge();
         }
@@ -42,14 +42,15 @@ public class BatchProcessingQueue<E> {
         return this.batchQueue.offer(element);
     }
 
-    public void purge() {
+    public synchronized void purge() {
         LOG.debug("Purging current batch queue");
         this.purgeTimer.cancel();
         this.purgeTimer.purge();
         this.purgeTimer = null;
 
         List<E> batch = new ArrayList<>(this.batchSize);
-        this.batchQueue.drainTo(batch, batchSize);
+        this.batchQueue.drainTo(batch);
+        LOG.trace(String.format("Purging %s", batch.toString()));
         this.callback.accept(batch);
     }
 
