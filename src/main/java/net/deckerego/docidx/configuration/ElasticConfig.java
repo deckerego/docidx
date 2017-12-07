@@ -24,17 +24,6 @@ public class ElasticConfig {
     public int batchSize = 10;
     public long batchWaitMillis = 10000;
 
-    public String getHost() { return this.host; }
-    public void setHost(String host) { this.host = host; }
-    public int getPort() { return this.port; }
-    public void setPort(int port) { this.port = port; }
-    public String getCluster() { return this.cluster; }
-    public void setCluster(String cluster) { this.cluster = cluster; }
-    public int getBatchSize() { return this.batchSize; }
-    public void setBatchSize(int batchSize) { this.batchSize = batchSize; }
-    public long getBatchWaitMillis() { return this.batchWaitMillis; }
-    public void setBatchWaitMillis(long batchWaitMillis) { this.batchWaitMillis = batchWaitMillis; }
-
     @Bean
     ElasticsearchOperations elasticsearchTemplate() throws UnknownHostException {
         Settings settings = Settings.builder()

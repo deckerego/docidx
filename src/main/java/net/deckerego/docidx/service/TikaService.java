@@ -1,6 +1,7 @@
 package net.deckerego.docidx.service;
 
 import net.deckerego.docidx.model.FileEntry;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.parser.AutoDetectParser;
@@ -93,8 +94,10 @@ public class TikaService {
 
         private FileEntry parse() {
             FileEntry entry = new FileEntry();
+            entry.parentPath = file.getParent().toString();
             entry.fileName = file.getFileName().toString();
             entry.lastModified = file.toFile().lastModified();
+            entry.id = DigestUtils.md5Hex(file.toString());
 
             try {
                 ContentHandler body = new BodyContentHandler();

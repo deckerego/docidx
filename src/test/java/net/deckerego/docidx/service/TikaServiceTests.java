@@ -12,7 +12,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
 @RunWith(SpringRunner.class)
-@SpringBootTest
+@SpringBootTest(classes = { TikaService.class })
 public class TikaServiceTests {
     @Autowired
     private TikaService tikaSvc;

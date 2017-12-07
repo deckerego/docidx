@@ -6,7 +6,8 @@ import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication
 @EnableAsync
-public class DocIndexApplication {
+public class
+DocIndexApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(DocIndexApplication.class, args);
 	}

@@ -1,26 +1,34 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.repository.QueuedDocumentRepository;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentMatchers;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import static org.assertj.core.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.then;
 
 @RunWith(SpringRunner.class)
-@SpringBootTest
+@SpringBootTest(classes = { CrawlerService.class })
 public class CrawlerServiceTests {
+
+    @MockBean
+    private TikaService tikaService;
+
+    @MockBean
+    private QueuedDocumentRepository documentRepository;
+
     @Autowired
-    private CrawlerService crawlSvc;
+    private CrawlerService crawlerService;
 
     @Test
     public void directoryStreamCollector() {
-        crawlSvc.crawl("tests");
-        try { //FIXME Because it's all background processing
-            Thread.sleep(5000);
-        } catch(InterruptedException e) {
-            fail("Error during hackish sleep");
-        }
+        this.crawlerService.crawl("tests");
+        then(this.tikaService).should().submit(ArgumentMatchers.anyCollection(), any());
+        then(this.documentRepository).should().offerUpdate(any());
     }
 }
