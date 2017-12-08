@@ -12,9 +12,8 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -42,10 +41,18 @@ public class CrawlerService {
 
     public void crawl(String rootPath) {
         Path cwd = FileSystems.getDefault().getPath(rootPath);
-
-        try(Stream<Path> fsStream = Files.find(cwd, Integer.MAX_VALUE, (p, a) -> Files.isExecutable(p) && a.isDirectory())) {
-            //This cannot recover from access exceptions, see https://bugs.openjdk.java.net/browse/JDK-8039910
-            fsStream.map(path -> new ParentEntry(path)).forEach(this.workBroker::publish);
+        try {
+            Files.walkFileTree(cwd, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) throws IOException {
+                    if(Files.isReadable(directory)) {
+                        workBroker.publish(new ParentEntry(directory));
+                        return FileVisitResult.CONTINUE;
+                    } else {
+                        return FileVisitResult.SKIP_SIBLINGS;
+                    }
+                }
+            });
         } catch(IOException e) {
             LOG.error(String.format("Fatal exception when finding dirs under %s", cwd), e);
         }
