@@ -43,7 +43,8 @@ public class CrawlerService {
     public void crawl(String rootPath) {
         Path cwd = FileSystems.getDefault().getPath(rootPath);
 
-        try(Stream<Path> fsStream = Files.find(cwd, Integer.MAX_VALUE, (p, a) -> a.isDirectory())) {
+        try(Stream<Path> fsStream = Files.find(cwd, Integer.MAX_VALUE, (p, a) -> Files.isExecutable(p) && a.isDirectory())) {
+            //This cannot recover from access exceptions, see https://bugs.openjdk.java.net/browse/JDK-8039910
             fsStream.map(path -> new ParentEntry(path)).forEach(this.workBroker::publish);
         } catch(IOException e) {
             LOG.error(String.format("Fatal exception when finding dirs under %s", cwd), e);

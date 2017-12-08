@@ -7,6 +7,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class WorkBrokerTests {
+
+    class TestMessage {
+        public String id;
+    }
+
     @Test
     public void testTaskCount() {
         WorkBroker broker = new WorkBroker(1000, 10, 10);
@@ -24,7 +29,7 @@ public class WorkBrokerTests {
         });
 
         broker.publish(new TestMessage());
-        broker.waitUntilEmpty();
+        broker.awaitShutdown();
 
         assertThat(callCount.get()).isEqualTo(1);
     }
@@ -44,19 +49,9 @@ public class WorkBrokerTests {
         testMsg.id = "TESTING";
 
         broker.publish(testMsg);
-        broker.waitUntilEmpty();
+        broker.awaitShutdown();
 
         assertThat(callCount.get()).isEqualTo(1);
-    }
-
-    @Test(expected = IllegalArgumentException.class)
-    public void testNoHandler() {
-        WorkBroker broker = new WorkBroker(1000, 1000, 10);
-        broker.publish(new TestMessage());
-    }
-
-    class TestMessage {
-        public String id;
     }
 
     @Test
@@ -70,7 +65,7 @@ public class WorkBrokerTests {
         });
 
         broker.publish(new TestMessage());
-        broker.waitUntilEmpty();
+        broker.awaitShutdown();
 
         assertThat(callCount.get()).isEqualTo(1);
     }

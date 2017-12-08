@@ -1,5 +1,6 @@
 package net.deckerego.docidx;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.service.CrawlerService;
 import net.deckerego.docidx.util.WorkBroker;
 import org.slf4j.Logger;
@@ -18,10 +19,13 @@ public class CommandLineAppStartupRunner implements CommandLineRunner {
     @Autowired
     private WorkBroker workBroker;
 
+    @Autowired
+    private CrawlerConfig crawlerConfig;
+
     @Override
     public void run(String... args) throws Exception {
-        crawlerService.crawl("tests");
-        workBroker.waitUntilEmpty();
+        crawlerService.crawl(crawlerConfig.rootPath);
+        workBroker.awaitShutdown();
         LOG.info("Indexing completed!");
     }
 }

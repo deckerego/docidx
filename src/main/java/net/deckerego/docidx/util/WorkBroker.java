@@ -7,7 +7,6 @@ import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
@@ -62,10 +61,11 @@ public class WorkBroker {
         LOG.trace(String.format("Consuming message %s", message.toString()));
 
         ConsumptionStrategy consumer = consumerMap.get(message.getClass());
-        if(consumer == null)
+        if(consumer == null) {
             LOG.error(String.format("No consumer for class %s", message.getClass().getCanonicalName()));
-
-        consumer.consume(message);
+        } else {
+            consumer.consume(message);
+        }
     }
 
     public long taskCount() {
@@ -75,15 +75,22 @@ public class WorkBroker {
         return totalTaskCount;
     }
 
-    public void waitUntilEmpty() throws InterruptedException {
+    public void shutdown() {
+        for(ConsumptionStrategy c : consumerMap.values())
+            c.shutdown();
+    }
+
+    public void awaitShutdown() throws InterruptedException {
         while(this.taskCount() > 0) {
             Thread.sleep(100);
         }
+        this.shutdown();
     }
 
     private interface ConsumptionStrategy<T> {
         void consume(T message);
         long taskCount();
+        void shutdown();
     }
 
     private class ThreadPoolStrategy<T> implements ConsumptionStrategy<T> {
@@ -105,29 +112,37 @@ public class WorkBroker {
         public long taskCount() {
             return this.threadPool.getActiveCount() + this.threadPool.getQueue().size();
         }
+
+        @Override
+        public void shutdown() {
+            try {
+                this.threadPool.shutdown();
+                this.threadPool.awaitTermination(timeoutMillis, TimeUnit.MILLISECONDS);
+            } catch(InterruptedException e) {
+                LOG.error("Error while shutting down ThreadPoolStrategy", e);
+            }
+        }
     }
 
     private class BatchStrategy<T> implements ConsumptionStrategy<T> {
         private ArrayBlockingQueue<T> batchQueue;
         private Consumer<List<T>> handler;
         private final ReentrantReadWriteLock updateLock = new ReentrantReadWriteLock();
-        private AtomicBoolean timerActive;
         private Timer purgeTimer;
 
 
         public BatchStrategy(Consumer<List<T>> handler) {
-            this.timerActive = new AtomicBoolean(false);
-            this.purgeTimer = new Timer();
+            this.purgeTimer = null;
             this.batchQueue = new ArrayBlockingQueue<>(capacity);
             this.handler = handler;
         }
 
         @Override
         public void consume(T message) {
-            this.updateLock.writeLock().lock(); //TODO This is kinda gross
-            if(! this.timerActive.get()) {
-                this.timerActive.set(true);
+            this.updateLock.writeLock().lock();
+            if(this.purgeTimer == null) {
                 LOG.debug(String.format("Scheduling purge timer for %d", purgeWaitMillis));
+                this.purgeTimer = new Timer();
                 this.purgeTimer.schedule(new PurgeTask(), purgeWaitMillis);
             }
             this.updateLock.writeLock().unlock();
@@ -143,11 +158,10 @@ public class WorkBroker {
         }
 
         private void purge() {
-            this.timerActive.set(false);
             this.updateLock.writeLock().lock();
             LOG.debug("Purging current batch queue");
             this.purgeTimer.cancel();
-            this.purgeTimer.purge();
+            this.purgeTimer = null;
             this.updateLock.writeLock().unlock();
 
             List<T> batch = new ArrayList<>(batchSize);
@@ -159,6 +173,13 @@ public class WorkBroker {
         @Override
         public long taskCount() {
             return this.batchQueue.size();
+        }
+
+        @Override
+        public void shutdown() {
+            if(this.taskCount() > 0)
+                purge();
+            this.batchQueue = null;
         }
 
         private class PurgeTask extends TimerTask {
