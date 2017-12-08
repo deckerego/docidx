@@ -1,6 +1,8 @@
 package net.deckerego.docidx.service;
 
 import net.deckerego.docidx.model.FileEntry;
+import net.deckerego.docidx.model.TikaTask;
+import net.deckerego.docidx.util.WorkBroker;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
@@ -13,37 +15,45 @@ import org.apache.tika.parser.pdf.PDFParser;
 import org.apache.tika.sax.BodyContentHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
+import javax.annotation.PostConstruct;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 @Service
 public class TikaService {
-    private static final int CORE_COUNT = Runtime.getRuntime().availableProcessors();
     private static final Logger LOG = LoggerFactory.getLogger(TikaService.class);
 
-    //TODO Move this to config value
-    private ThreadPoolExecutor threadPool;
-    private int capacity;
+    @Autowired
+    public WorkBroker workBroker;
+
     private Parser documentParser;
     private ParseContext parserContext;
 
     public TikaService() {
-        this.capacity = 1000; //TODO Move to config
-        this.threadPool = new ThreadPoolExecutor(CORE_COUNT, CORE_COUNT, 3600, TimeUnit.SECONDS, new ArrayBlockingQueue<>(capacity));
         this.documentParser = createParser();
         this.parserContext = createContext(this.documentParser);
+    }
+
+    @PostConstruct
+    public void initBroker() {
+        this.workBroker.handle(TikaTask.class, task -> {
+            LOG.info(String.format("Starting Tika parsing %s", task.file));
+            long startTime = System.currentTimeMillis();
+            FileEntry entry = this.parse(task.file);
+            LOG.info(String.format("Completed Tika parsing %s in %d seconds", task.file, (System.currentTimeMillis() - startTime) / 1000));
+
+            task.callback.accept(entry);
+        });
     }
 
     private static Parser createParser() {
@@ -70,55 +80,39 @@ public class TikaService {
 
     public void submit(Collection<Path> files, Consumer<FileEntry> callback) {
         LOG.debug(String.format("Submitting parse of %s", files));
-        for (Path file : files)
-            this.threadPool.execute(new TikaTask(file, callback));
+        for (Path file : files) {
+            TikaTask task = new TikaTask(file, callback);
+            this.workBroker.publish(task);
+        }
     }
 
-    private class TikaTask implements Runnable {
-        private Path file;
-        private Consumer<FileEntry> callback;
 
-        public TikaTask(Path file, Consumer<FileEntry> callback) {
-            this.callback = callback;
-            this.file = file;
-        }
+    private FileEntry parse(Path file) {
+        FileEntry entry = new FileEntry();
+        entry.parentPath = file.getParent().toString();
+        entry.fileName = file.getFileName().toString();
+        entry.lastModified = file.toFile().lastModified();
+        entry.id = DigestUtils.md5Hex(file.toString());
 
-        public void run() {
-            LOG.info(String.format("Starting Tika parsing %s", this.file));
-            long startTime = System.currentTimeMillis();
-            FileEntry entry = this.parse();
-            LOG.info(String.format("Completed Tika parsing %s in %d seconds", this.file, (System.currentTimeMillis() - startTime) / 1000));
+        try {
+            ContentHandler body = new BodyContentHandler();
+            Metadata metadata = new Metadata();
+            InputStream fis = new FileInputStream(file.toFile());
 
-            callback.accept(entry);
-        }
+            documentParser.parse(fis, body, metadata, parserContext);
 
-        private FileEntry parse() {
-            FileEntry entry = new FileEntry();
-            entry.parentPath = file.getParent().toString();
-            entry.fileName = file.getFileName().toString();
-            entry.lastModified = file.toFile().lastModified();
-            entry.id = DigestUtils.md5Hex(file.toString());
-
-            try {
-                ContentHandler body = new BodyContentHandler();
-                Metadata metadata = new Metadata();
-                InputStream fis = new FileInputStream(file.toFile());
-
-                documentParser.parse(fis, body, metadata, parserContext);
-
-                entry.body = body.toString();
-                entry.metadata = new HashMap<>();
-                for (String prop : metadata.names())
-                    entry.metadata.put(prop, metadata.get(prop));
-            } catch(IOException e) {
-                LOG.error(String.format("Could not read file %s", this.file.toString()), e);
-            } catch(SAXException e) {
-                LOG.error(String.format("Could not read XML %s", this.file.toString()), e);
-            } catch(TikaException e) {
-                LOG.error(String.format("Error parsing file %s", this.file.toString()), e);
-            } finally {
-                return entry;
-            }
+            entry.body = body.toString();
+            entry.metadata = new HashMap<>();
+            for (String prop : metadata.names())
+                entry.metadata.put(prop, metadata.get(prop));
+        } catch(IOException e) {
+            LOG.error(String.format("Could not read file %s", file.toString()), e);
+        } catch(SAXException e) {
+            LOG.error(String.format("Could not read XML %s", file.toString()), e);
+        } catch(TikaException e) {
+            LOG.error(String.format("Error parsing file %s", file.toString()), e);
+        } finally {
+            return entry;
         }
     }
 }
