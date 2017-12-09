@@ -7,6 +7,7 @@ import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
@@ -21,7 +22,7 @@ public class WorkBroker {
     private Map<Class, ConsumptionStrategy> consumerMap;
 
     public WorkBroker(long purgeWaitMillis, int capacity, int batchSize) {
-        this(Runtime.getRuntime().availableProcessors(), purgeWaitMillis, 60 * 60 * 1000, capacity, batchSize);
+        this(Runtime.getRuntime().availableProcessors() / 2, purgeWaitMillis, 60 * 60 * 1000, capacity, batchSize);
     }
 
     public WorkBroker(int threadPoolSize, long purgeWaitMillis, long timeoutMillis, int capacity, int batchSize) {
@@ -127,7 +128,7 @@ public class WorkBroker {
     private class BatchStrategy<T> implements ConsumptionStrategy<T> {
         private ArrayBlockingQueue<T> batchQueue;
         private Consumer<List<T>> handler;
-        private final ReentrantReadWriteLock updateLock = new ReentrantReadWriteLock();
+        private final ReadWriteLock updateLock = new ReentrantReadWriteLock();
         private Timer purgeTimer;
 
 
@@ -160,8 +161,12 @@ public class WorkBroker {
         private void purge() {
             this.updateLock.writeLock().lock();
             LOG.debug("Purging current batch queue");
-            this.purgeTimer.cancel();
-            this.purgeTimer = null;
+            if(this.purgeTimer == null) {
+                LOG.warn("Purge timer for thread pool was null - this shouldn't be the case...");
+            } else {
+                this.purgeTimer.cancel();
+                this.purgeTimer = null;
+            }
             this.updateLock.writeLock().unlock();
 
             List<T> batch = new ArrayList<>(batchSize);

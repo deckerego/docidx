@@ -6,7 +6,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "crawler")
 public class CrawlerConfig {
-    public String rootPath;
+    private String rootPath;
 
     public void setRootPath(String rootPath) { this.rootPath = rootPath; }
     public String getRootPath() { return this.rootPath; }

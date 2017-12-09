@@ -44,13 +44,20 @@ public class CrawlerService {
         try {
             Files.walkFileTree(cwd, new SimpleFileVisitor<>() {
                 @Override
-                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) throws IOException {
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
                     if(Files.isReadable(directory)) {
+                        LOG.debug(String.format("Submitting parent entry %s", directory.toString()));
                         workBroker.publish(new ParentEntry(directory));
                         return FileVisitResult.CONTINUE;
                     } else {
-                        return FileVisitResult.SKIP_SIBLINGS;
+                        return FileVisitResult.SKIP_SUBTREE;
                     }
+                }
+
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                    LOG.error(String.format("Could not access %s, skipping", file.toAbsolutePath().toString()));
+                    return FileVisitResult.SKIP_SUBTREE;
                 }
             });
         } catch(IOException e) {

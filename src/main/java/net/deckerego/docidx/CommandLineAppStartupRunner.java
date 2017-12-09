@@ -24,7 +24,7 @@ public class CommandLineAppStartupRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        crawlerService.crawl(crawlerConfig.rootPath);
+        crawlerService.crawl(crawlerConfig.getRootPath());
         workBroker.awaitShutdown();
         LOG.info("Indexing completed!");
     }

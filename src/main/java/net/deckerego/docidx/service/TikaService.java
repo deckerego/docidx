@@ -1,5 +1,6 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.ParserConfig;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.TikaTask;
 import net.deckerego.docidx.util.WorkBroker;
@@ -36,12 +37,20 @@ public class TikaService {
     @Autowired
     public WorkBroker workBroker;
 
+    @Autowired
+    public ParserConfig parserConfig;
+
     private Parser documentParser;
     private ParseContext parserContext;
 
     public TikaService() {
-        this.documentParser = createParser();
-        this.parserContext = createContext(this.documentParser);
+        PDFParser pdfParser = new PDFParser();
+        pdfParser.setOcrStrategy("ocr_and_text");
+
+        DefaultParser defaultParser = new DefaultParser();
+        LOG.info("Created Tika OCR Parser");
+
+        this.documentParser = new AutoDetectParser(defaultParser, pdfParser);
     }
 
     @PostConstruct
@@ -56,26 +65,16 @@ public class TikaService {
         });
     }
 
-    private static Parser createParser() {
-        PDFParser pdfParser = new PDFParser();
-        pdfParser.setOcrStrategy("ocr_and_text");
-
-        DefaultParser defaultParser = new DefaultParser();
-        LOG.info("Created Tika OCR Parser");
-
-        return new AutoDetectParser(defaultParser, pdfParser);
-    }
-
-    private static ParseContext createContext(Parser parser) {
+    @PostConstruct
+    private void createContext() {
         TesseractOCRConfig config = new TesseractOCRConfig();
-        config.setLanguage("eng");
+        config.setLanguage(this.parserConfig.getOcrLanguage());
+        config.setTimeout(this.parserConfig.getOcrTimeoutSeconds());
 
-        ParseContext context = new ParseContext();
-        context.set(Parser.class, parser);
-        context.set(TesseractOCRConfig.class, config);
+        this.parserContext = new ParseContext();
+        this.parserContext.set(Parser.class, this.documentParser);
+        this.parserContext.set(TesseractOCRConfig.class, config);
         LOG.info("Created Tika OCR Context");
-
-        return context;
     }
 
     public void submit(Collection<Path> files, Consumer<FileEntry> callback) {
