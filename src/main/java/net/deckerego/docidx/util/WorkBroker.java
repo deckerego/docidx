@@ -23,6 +23,7 @@ public class WorkBroker {
 
     public WorkBroker(long purgeWaitMillis, int capacity, int batchSize) {
         this(Runtime.getRuntime().availableProcessors() / 2, purgeWaitMillis, 60 * 60 * 1000, capacity, batchSize);
+        LOG.info(String.format("Found %d available processors, provisioned %d threads in the pool", Runtime.getRuntime().availableProcessors(), this.threadPoolSize));
     }
 
     public WorkBroker(int threadPoolSize, long purgeWaitMillis, long timeoutMillis, int capacity, int batchSize) {
