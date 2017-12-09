@@ -18,11 +18,22 @@ import java.net.UnknownHostException;
 @ConfigurationProperties(prefix = "elasticsearch")
 @EnableElasticsearchRepositories("net.deckerego.docidx.repository")
 public class ElasticConfig {
-    public String host;
-    public int port;
-    public String cluster;
-    public int batchSize = 10;
-    public long batchWaitMillis = 10000;
+    private String host;
+    private int port;
+    private String cluster;
+    private int batchSize = 10;
+    private long batchWaitMillis = 10000;
+
+    public void setHost(String host) { this.host = host; }
+    public String getHost() { return this.host; }
+    public void setPort(int port) { this.port = port; }
+    public int getPort() { return this.port; }
+    public void setCluster(String cluster) { this.cluster = cluster; }
+    public String getCluster() { return this.cluster; }
+    public void setBatchSize(int batchSize) { this.batchSize = batchSize; }
+    public int getBatchSize() { return this.batchSize; }
+    public void setBatchWaitMillis(long batchWaitMillis) { this.batchWaitMillis = batchWaitMillis; }
+    public long getBatchWaitMillis() { return this.batchWaitMillis; }
 
     @Bean
     ElasticsearchOperations elasticsearchTemplate() throws UnknownHostException {

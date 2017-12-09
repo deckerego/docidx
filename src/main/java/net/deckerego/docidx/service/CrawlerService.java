@@ -1,20 +1,21 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
-import net.deckerego.docidx.repository.QueuedDocumentRepository;
+import net.deckerego.docidx.model.ParentEntry;
+import net.deckerego.docidx.repository.DocumentRepository;
+import net.deckerego.docidx.util.WorkBroker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.io.IOException;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Flow;
-import java.util.concurrent.SubmissionPublisher;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -27,19 +28,40 @@ public class CrawlerService {
     public TikaService tikaService;
 
     @Autowired
-    public QueuedDocumentRepository documentRepository;
+    public DocumentRepository documentRepository;
+
+    @Autowired
+    public WorkBroker workBroker;
+
+    @PostConstruct
+    public void initBroker() {
+        this.workBroker.handleBatch(FileEntry.class, this.documentRepository::saveAll);
+        this.workBroker.handle(ParentEntry.class, this::routeFiles);
+    }
 
     public void crawl(String rootPath) {
-        SubmissionPublisher<Path> publisher = new SubmissionPublisher<>();
-        publisher.subscribe(new CrawlSubscriber());
         Path cwd = FileSystems.getDefault().getPath(rootPath);
+        try {
+            Files.walkFileTree(cwd, new SimpleFileVisitor<>() {
+                @Override
+                public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
+                    if(Files.isReadable(directory)) {
+                        LOG.debug(String.format("Submitting parent entry %s", directory.toString()));
+                        workBroker.publish(new ParentEntry(directory));
+                        return FileVisitResult.CONTINUE;
+                    } else {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                }
 
-        try(Stream<Path> fsStream = Files.find(cwd, Integer.MAX_VALUE, (p, a) -> a.isDirectory())) {
-            fsStream.forEach(file -> publisher.offer(file, (sub, msg) -> true));
+                @Override
+                public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                    LOG.error(String.format("Could not access %s, skipping", file.toAbsolutePath().toString()));
+                    return FileVisitResult.SKIP_SUBTREE;
+                }
+            });
         } catch(IOException e) {
             LOG.error(String.format("Fatal exception when finding dirs under %s", cwd), e);
-        } finally {
-            publisher.close();
         }
     }
 
@@ -82,56 +104,14 @@ public class CrawlerService {
         return actions;
     }
 
-    private class DocumentActions {
-        public Path directory;
-        public Set<FileEntry> deletions;
-        public Set<Path> additions;
-        public Set<Path> updates;
+    private void routeFiles(ParentEntry parent) {
+        CompletableFuture<Map<String, FileEntry>> futureDocuments = CompletableFuture.supplyAsync(() -> getDocuments(parent.directory));
+        CompletableFuture<Map<String, Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(parent.directory));
+        CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p));
 
-        public DocumentActions(Path directory) {
-            this.directory = directory;
-            this.deletions = new HashSet<>();
-            this.additions = new HashSet<>();
-            this.updates = new HashSet<>();
-        }
-
-        @Override
-        public String toString() {
-            return String.format("For %s\nAdditions: %s\nUpdates: %s\nDeletions: %s",
-                    directory.getFileName().toString(), additions, updates, deletions);
-        }
-    }
-
-    private class CrawlSubscriber implements Flow.Subscriber<Path> {
-        private Flow.Subscription subscription;
-
-        @Override
-        public void onSubscribe(Flow.Subscription subscription) {
-            this.subscription= subscription;
-            this.subscription.request(1);
-        }
-
-        @Override
-        public void onNext(Path message) {
-            CompletableFuture<Map<String, FileEntry>> futureDocuments = CompletableFuture.supplyAsync(() -> getDocuments(message));
-            CompletableFuture<Map<String, Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(message));
-            CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(message, d, p));
-
-            futureEntries
-                    .whenComplete((actions, ex) -> tikaService.submit(actions.additions, documentRepository::offerUpdate))
-                    .whenComplete((actions, ex) -> tikaService.submit(actions.updates, documentRepository::offerUpdate))
-                    .whenComplete((actions, ex) -> actions.deletions.forEach(documentRepository::offerDelete));
-            subscription.request(1);
-        }
-
-        @Override
-        public void onComplete() {
-            LOG.info("Completed CrawlSubscriber");
-        }
-
-        @Override
-        public void onError(Throwable t) {
-            LOG.error("Error when processing CrawlSubscription message", t);
-        }
+        futureEntries
+                .whenComplete((actions, ex) -> tikaService.submit(actions.additions, workBroker::publish))
+                .whenComplete((actions, ex) -> tikaService.submit(actions.updates, workBroker::publish))
+                .whenComplete((actions, ex) -> documentRepository.deleteAll(actions.deletions));
     }
 }
