@@ -44,16 +44,6 @@ public class TikaService {
     private Parser documentParser;
     private ParseContext parserContext;
 
-    public TikaService() {
-        PDFParser pdfParser = new PDFParser();
-        pdfParser.setOcrStrategy("ocr_and_text");
-
-        DefaultParser defaultParser = new DefaultParser();
-        LOG.info("Created Tika OCR Parser");
-
-        this.documentParser = new AutoDetectParser(defaultParser, pdfParser);
-    }
-
     @PostConstruct
     public void initBroker() {
         this.workBroker.handle(TikaTask.class, task -> {
@@ -68,6 +58,17 @@ public class TikaService {
 
     @PostConstruct
     private void createContext() {
+        DefaultParser defaultParser = new DefaultParser();
+
+        if(parserConfig.getEnableOcr()) {
+            PDFParser pdfParser = new PDFParser();
+            pdfParser.setOcrStrategy("ocr_and_text");
+            this.documentParser = new AutoDetectParser(defaultParser, pdfParser);
+        } else {
+            this.documentParser = new AutoDetectParser(defaultParser);
+        }
+        LOG.info("Created Tika OCR Parser");
+
         TesseractOCRConfig config = new TesseractOCRConfig();
         config.setLanguage(this.parserConfig.getOcrLanguage());
         config.setTimeout(this.parserConfig.getOcrTimeoutSeconds());
@@ -94,11 +95,10 @@ public class TikaService {
         entry.lastModified = file.toFile().lastModified();
         entry.id = DigestUtils.md5Hex(file.toString());
 
+        ContentHandler body = new BodyContentHandler();
+        Metadata metadata = new Metadata();
         try {
-            ContentHandler body = new BodyContentHandler();
-            Metadata metadata = new Metadata();
             InputStream fis = new FileInputStream(file.toFile());
-
             documentParser.parse(fis, body, metadata, parserContext);
 
             entry.body = body.toString();
@@ -108,10 +108,14 @@ public class TikaService {
         } catch(IOException e) {
             LOG.error(String.format("Could not read file %s", file.toString()), e);
         } catch(SAXException e) {
-            LOG.error(String.format("Could not read XML %s", file.toString()), e);
+            LOG.error(String.format("Error parsing %s to XML", file.toString()), e);
         } catch(TikaException e) {
             LOG.error(String.format("Error parsing file %s", file.toString()), e);
         } finally {
+            entry.body = body.toString();
+            entry.metadata = new HashMap<>();
+            for (String prop : metadata.names())
+                entry.metadata.put(prop, metadata.get(prop));
             return entry;
         }
     }

@@ -14,8 +14,8 @@ DocIndexApplication {
 		SpringApplication.run(DocIndexApplication.class, args);
 	}
 
-	@Bean
+	@Bean //FIXME Move these parameters to the config file
 	WorkBroker workBroker() { //TODO Move to config
-		return new WorkBroker(10 * 1000, 1000, 10);
+		return new WorkBroker(4, 10 * 1000, 60 * 60 * 1000, 10000, 10);
 	}
 }
