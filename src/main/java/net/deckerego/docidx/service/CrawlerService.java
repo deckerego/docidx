@@ -79,7 +79,7 @@ public class CrawlerService {
 
     public Map<String, FileEntry> getDocuments(Path path) {
         List<FileEntry> files = this.documentRepository.findByParentPath(path.toString());
-        LOG.debug(String.format("Found %d documents for %s", files.size(), path.getFileName()));
+        LOG.debug(String.format("Found %d documents for %s", files.size(), path.toString()));
         return files.stream().collect(Collectors.toMap(e -> e.fileName, Function.identity()));
     }
 
@@ -126,8 +126,17 @@ public class CrawlerService {
         CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p));
 
         futureEntries
-                .whenComplete((actions, ex) -> tikaService.submit(actions.additions, workBroker::publish))
-                .whenComplete((actions, ex) -> tikaService.submit(actions.updates, workBroker::publish))
-                .whenComplete((actions, ex) -> documentRepository.deleteAll(actions.deletions));
+                .whenComplete((actions, ex) -> {
+                    if(ex != null) LOG.error(String.format("Error mapping additions for %s", parent.toString()), ex);
+                    else tikaService.submit(actions.additions, workBroker::publish);
+                })
+                .whenComplete((actions, ex) -> {
+                    if(ex != null) LOG.error(String.format("Error mapping updates for %s", parent.toString()), ex);
+                    else tikaService.submit(actions.updates, workBroker::publish);
+                })
+                .whenComplete((actions, ex) -> {
+                    if(ex != null) LOG.error(String.format("Error mapping deletions for %s", parent.toString()), ex);
+                    else documentRepository.deleteAll(actions.deletions);
+                });
     }
 }

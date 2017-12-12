@@ -182,10 +182,14 @@ public class WorkBroker {
             }
             this.updateLock.writeLock().unlock();
 
-            List<T> batch = new ArrayList<>(batchSize);
-            this.batchQueue.drainTo(batch);
-            LOG.trace(String.format("Purging %s", batch.toString()));
-            this.handler.accept(batch);
+            if(this.batchQueue.size() <= 0) {
+                LOG.warn("Purge was requested but batch size is 0");
+            } else {
+                List<T> batch = new ArrayList<>(batchSize);
+                this.batchQueue.drainTo(batch);
+                LOG.trace(String.format("Purging %s", batch.toString()));
+                this.handler.accept(batch);
+            }
         }
 
         @Override
