@@ -7,6 +7,8 @@ import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
@@ -21,8 +23,12 @@ public class WorkBroker {
     private int batchSize;
     private Map<Class, ConsumptionStrategy> consumerMap;
 
+    private AtomicLong publishCount = new AtomicLong(0);
+    private AtomicLong consumedCount = new AtomicLong(0);
+
     public WorkBroker(long purgeWaitMillis, int capacity, int batchSize) {
         this(Runtime.getRuntime().availableProcessors() / 2, purgeWaitMillis, 60 * 60 * 1000, capacity, batchSize);
+        LOG.info(String.format("Found %d available processors, provisioned %d threads in the pool", Runtime.getRuntime().availableProcessors(), this.threadPoolSize));
     }
 
     public WorkBroker(int threadPoolSize, long purgeWaitMillis, long timeoutMillis, int capacity, int batchSize) {
@@ -59,6 +65,7 @@ public class WorkBroker {
     }
 
     public <T> void publish(T message) {
+        this.publishCount.incrementAndGet();
         LOG.trace(String.format("Consuming message %s", message.toString()));
 
         ConsumptionStrategy consumer = consumerMap.get(message.getClass());
@@ -86,6 +93,7 @@ public class WorkBroker {
             Thread.sleep(100);
         }
         this.shutdown();
+        LOG.info(String.format("Published %d messages and consumed %d", this.publishCount.get(), this.consumedCount.get()));
     }
 
     private interface ConsumptionStrategy<T> {
@@ -106,7 +114,10 @@ public class WorkBroker {
 
         @Override
         public void consume(T message) {
-            this.threadPool.execute(() -> this.handler.accept(message));
+            this.threadPool.execute(() -> {
+                this.handler.accept(message);
+                consumedCount.incrementAndGet();
+            });
         }
 
         @Override
@@ -156,6 +167,8 @@ public class WorkBroker {
                 LOG.debug(String.format("Purging %d elements with buffer size %d", this.batchQueue.size(), batchSize));
                 purge();
             }
+
+            consumedCount.incrementAndGet();
         }
 
         private void purge() {
@@ -169,10 +182,14 @@ public class WorkBroker {
             }
             this.updateLock.writeLock().unlock();
 
-            List<T> batch = new ArrayList<>(batchSize);
-            this.batchQueue.drainTo(batch);
-            LOG.trace(String.format("Purging %s", batch.toString()));
-            this.handler.accept(batch);
+            if(this.batchQueue.size() <= 0) {
+                LOG.warn("Purge was requested but batch size is 0");
+            } else {
+                List<T> batch = new ArrayList<>(batchSize);
+                this.batchQueue.drainTo(batch);
+                LOG.trace(String.format("Purging %s", batch.toString()));
+                this.handler.accept(batch);
+            }
         }
 
         @Override

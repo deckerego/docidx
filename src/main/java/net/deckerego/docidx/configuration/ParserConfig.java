@@ -6,11 +6,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "parser")
 public class ParserConfig {
-    private int ocrTimeoutSeconds;
-    private String ocrLanguage;
+    private int ocrTimeoutSeconds = 300;
+    private String ocrLanguage = "eng";
+    private boolean enableOcr = true;
 
     public void setOcrTimeoutSeconds(int ocrTimeoutSeconds) { this.ocrTimeoutSeconds = ocrTimeoutSeconds; }
     public int getOcrTimeoutSeconds() { return ocrTimeoutSeconds; }
     public void setOcrLanguage(String ocrLanguage) { this.ocrLanguage = ocrLanguage; }
     public String getOcrLanguage() { return ocrLanguage; }
+    public void setEnableOcr(boolean enableOcr) { this.enableOcr = enableOcr; }
+    public boolean getEnableOcr() { return this.enableOcr; }
 }

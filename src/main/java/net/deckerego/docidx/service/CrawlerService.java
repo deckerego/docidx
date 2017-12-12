@@ -11,11 +11,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -33,10 +35,19 @@ public class CrawlerService {
     @Autowired
     public WorkBroker workBroker;
 
+    private AtomicLong addCount = new AtomicLong(0);
+    private AtomicLong modCount = new AtomicLong(0);
+    private AtomicLong delCount = new AtomicLong(0);
+
     @PostConstruct
     public void initBroker() {
         this.workBroker.handleBatch(FileEntry.class, this.documentRepository::saveAll);
         this.workBroker.handle(ParentEntry.class, this::routeFiles);
+    }
+
+    @PreDestroy
+    public void debug() {
+        LOG.info(String.format("Crawled %d additions, %d modifications and %d deletions", this.addCount.get(), this.modCount.get(), this.delCount.get()));
     }
 
     public void crawl(String rootPath) {
@@ -50,14 +61,15 @@ public class CrawlerService {
                         workBroker.publish(new ParentEntry(directory));
                         return FileVisitResult.CONTINUE;
                     } else {
-                        return FileVisitResult.SKIP_SUBTREE;
+                        LOG.warn(String.format("Could not read %s, skipping", directory.toAbsolutePath().toString()));
+                        return FileVisitResult.CONTINUE;
                     }
                 }
 
                 @Override
                 public FileVisitResult visitFileFailed(Path file, IOException exc) {
                     LOG.error(String.format("Could not access %s, skipping", file.toAbsolutePath().toString()));
-                    return FileVisitResult.SKIP_SUBTREE;
+                    return FileVisitResult.CONTINUE;
                 }
             });
         } catch(IOException e) {
@@ -65,12 +77,13 @@ public class CrawlerService {
         }
     }
 
-    private Map<String, FileEntry> getDocuments(Path path) {
+    public Map<String, FileEntry> getDocuments(Path path) {
         List<FileEntry> files = this.documentRepository.findByParentPath(path.toString());
+        LOG.debug(String.format("Found %d documents for %s", files.size(), path.toString()));
         return files.stream().collect(Collectors.toMap(e -> e.fileName, Function.identity()));
     }
 
-    private Map<String, Path> getFiles(Path path) {
+    public Map<String, Path> getFiles(Path path) {
         Map<String, Path> files = new HashMap<>();
 
         try (Stream<Path> fsStream = Files.find(path, 1, (p, a) -> a.isRegularFile())) {
@@ -83,22 +96,25 @@ public class CrawlerService {
         return files;
     }
 
-    private DocumentActions merge(Path parent, Map<String, FileEntry> documents, Map<String, Path> files) {
+    public DocumentActions merge(Path parent, Map<String, FileEntry> documents, Map<String, Path> files) {
         DocumentActions actions = new DocumentActions(parent);
 
         actions.additions = files.keySet().stream()
                 .filter(f -> ! documents.containsKey(f))
                 .map(files::get).collect(Collectors.toSet());
+        addCount.addAndGet(actions.additions.size());
         LOG.debug(String.format("Found %d additions for %s", actions.additions.size(), parent.getFileName().toString()));
 
         actions.updates = files.keySet().stream()
                 .filter(f -> documents.containsKey(f) && documents.get(f).lastModified < files.get(f).toFile().lastModified())
                 .map(files::get).collect(Collectors.toSet());
+        modCount.addAndGet(actions.updates.size());
         LOG.debug(String.format("Found %d updates for %s", actions.updates.size(), parent.getFileName().toString()));
 
         actions.deletions = documents.keySet().stream()
                 .filter(f -> ! files.containsKey(f))
                 .map(documents::get).collect(Collectors.toSet());
+        delCount.addAndGet(actions.deletions.size());
         LOG.debug(String.format("Found %d deletions for %s", actions.deletions.size(), parent.getFileName().toString()));
 
         return actions;
@@ -110,8 +126,17 @@ public class CrawlerService {
         CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p));
 
         futureEntries
-                .whenComplete((actions, ex) -> tikaService.submit(actions.additions, workBroker::publish))
-                .whenComplete((actions, ex) -> tikaService.submit(actions.updates, workBroker::publish))
-                .whenComplete((actions, ex) -> documentRepository.deleteAll(actions.deletions));
+                .whenComplete((actions, ex) -> {
+                    if(ex != null) LOG.error(String.format("Error mapping additions for %s", parent.toString()), ex);
+                    else tikaService.submit(actions.additions, workBroker::publish);
+                })
+                .whenComplete((actions, ex) -> {
+                    if(ex != null) LOG.error(String.format("Error mapping updates for %s", parent.toString()), ex);
+                    else tikaService.submit(actions.updates, workBroker::publish);
+                })
+                .whenComplete((actions, ex) -> {
+                    if(ex != null) LOG.error(String.format("Error mapping deletions for %s", parent.toString()), ex);
+                    else documentRepository.deleteAll(actions.deletions);
+                });
     }
 }
