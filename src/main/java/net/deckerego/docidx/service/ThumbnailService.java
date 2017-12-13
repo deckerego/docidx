@@ -1,5 +1,7 @@
 package net.deckerego.docidx.service;
 
+import org.apache.commons.imaging.ImageReadException;
+import org.apache.commons.imaging.Imaging;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.slf4j.Logger;
@@ -7,7 +9,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
-import javax.imageio.ImageIO;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
@@ -35,6 +36,9 @@ public class ThumbnailService {
         } catch(IOException e) {
             LOG.error(String.format("Couldn't generate thumbnail for %s type %s", file.toString(), type), e);
             image = blankImage;
+        } catch(ImageReadException e) {
+            LOG.error(String.format("Couldn't read file %s type %s to generate thumbnail", file.toString(), type), e);
+            image = blankImage;
         }
 
         if(image != null && image.getHeight() >= 32) {
@@ -52,10 +56,10 @@ public class ThumbnailService {
         return image;
     }
 
-    private BufferedImage renderImage(File file, float scale) throws IOException {
+    private BufferedImage renderImage(File file, float scale) throws IOException, ImageReadException {
         float finalScale = scale / 2; // Double the reduction in scale. Because I said so.
 
-        BufferedImage image = ImageIO.read(file);
+        BufferedImage image = Imaging.getBufferedImage(file);
         BufferedImage transformedImage =
                 new BufferedImage((int)(image.getWidth() * finalScale), (int)(image.getHeight() * finalScale), BufferedImage.TYPE_INT_ARGB);
 
