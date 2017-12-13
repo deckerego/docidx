@@ -6,8 +6,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.elasticsearch.annotations.Document;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Base64;
 import java.util.Date;
 import java.util.Map;
 
@@ -22,6 +28,7 @@ public class FileEntry {
     public Long lastModified;
     public String body;
     public Map<String, String> metadata;
+    public BufferedImage thumbnail;
 
     @JsonGetter("lastModified")
     public String getLastModified() {
@@ -35,6 +42,29 @@ public class FileEntry {
         } catch(ParseException e) {
             LOG.error(String.format("Could not deserialize lastModified date of %s", this.id), e);
             this.lastModified = null;
+        }
+    }
+
+    @JsonGetter("thumbnail")
+    public byte[] getThumbnail() {
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            ImageIO.write(this.thumbnail, "PNG", outputStream);
+            return outputStream.toByteArray();
+        } catch(IOException e) {
+            LOG.error(String.format("Could not serialize thumbnail of %s", this.id), e);
+            return new byte[0];
+        }
+    }
+
+    @JsonSetter("thumbnail")
+    public void setThumbnail(byte[] image) {
+        try {
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(image);
+            this.thumbnail = ImageIO.read(inputStream);
+        } catch(IOException e) {
+            LOG.error(String.format("Could not deserialize thumbnail of %s", this.id), e);
+            this.thumbnail = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
         }
     }
 

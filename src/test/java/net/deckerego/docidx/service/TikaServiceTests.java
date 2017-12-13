@@ -26,6 +26,9 @@ public class TikaServiceTests {
     @MockBean
     private CrawlerConfig crawlerConfig;
 
+    @MockBean
+    private ThumbnailService thumbnailService;
+
     @Autowired
     private ParserConfig parserConfig;
 

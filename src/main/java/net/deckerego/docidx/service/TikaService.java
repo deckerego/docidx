@@ -23,6 +23,7 @@ import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
 import javax.annotation.PostConstruct;
+import java.awt.image.BufferedImage;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,6 +46,9 @@ public class TikaService {
 
     @Autowired
     public ParserConfig parserConfig;
+
+    @Autowired
+    public ThumbnailService thumbnailService;
 
     private Parser documentParser;
     private ParseContext parserContext;
@@ -92,7 +96,6 @@ public class TikaService {
         }
     }
 
-
     private FileEntry parse(Path file) {
         Path rootPath = Paths.get(crawlerConfig.getRootPath());
         Path parentPath = rootPath.relativize(file.getParent());
@@ -113,6 +116,9 @@ public class TikaService {
             entry.metadata = new HashMap<>();
             for (String prop : metadata.names())
                 entry.metadata.put(prop, metadata.get(prop));
+
+            String contentType = entry.metadata.getOrDefault("Content-Type", "application/octet-stream");
+            entry.thumbnail = thumbnailService.render(file.toFile(), contentType, 0.5f);
         } catch(IOException e) {
             LOG.error(String.format("Could not read file %s", file.toString()), e);
         } catch(SAXException e) {
