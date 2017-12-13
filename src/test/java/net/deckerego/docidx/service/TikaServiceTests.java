@@ -1,5 +1,6 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.ParserConfig;
 import net.deckerego.docidx.model.TikaTask;
 import net.deckerego.docidx.util.WorkBroker;
@@ -22,6 +23,12 @@ public class TikaServiceTests {
     @MockBean
     private WorkBroker workBroker;
 
+    @MockBean
+    private CrawlerConfig crawlerConfig;
+
+    @MockBean
+    private ThumbnailService thumbnailService;
+
     @Autowired
     private ParserConfig parserConfig;
 
@@ -30,6 +37,7 @@ public class TikaServiceTests {
 
     @Test
     public void submitFiles() {
+        when(crawlerConfig.getRootPath()).thenReturn(".");
         this.tikaSvc.submit(List.of(FileSystems.getDefault().getPath("./README.md")), e -> assertThat(e).isNotNull());
         then(this.workBroker).should().publish(any(TikaTask.class));
     }

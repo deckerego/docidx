@@ -1,5 +1,6 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.ParserConfig;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.TikaTask;
@@ -22,10 +23,12 @@ import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
 import javax.annotation.PostConstruct;
+import java.awt.image.BufferedImage;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -39,7 +42,13 @@ public class TikaService {
     public WorkBroker workBroker;
 
     @Autowired
+    public CrawlerConfig crawlerConfig;
+
+    @Autowired
     public ParserConfig parserConfig;
+
+    @Autowired
+    public ThumbnailService thumbnailService;
 
     private Parser documentParser;
     private ParseContext parserContext;
@@ -87,10 +96,12 @@ public class TikaService {
         }
     }
 
-
     private FileEntry parse(Path file) {
+        Path rootPath = Paths.get(crawlerConfig.getRootPath());
+        Path parentPath = rootPath.relativize(file.getParent());
+
         FileEntry entry = new FileEntry();
-        entry.parentPath = file.getParent().toString();
+        entry.parentPath = parentPath.toString();
         entry.fileName = file.getFileName().toString();
         entry.lastModified = file.toFile().lastModified();
         entry.id = DigestUtils.md5Hex(file.toString());
@@ -105,6 +116,9 @@ public class TikaService {
             entry.metadata = new HashMap<>();
             for (String prop : metadata.names())
                 entry.metadata.put(prop, metadata.get(prop));
+
+            String contentType = entry.metadata.getOrDefault("Content-Type", "application/octet-stream");
+            entry.thumbnail = thumbnailService.render(file.toFile(), contentType, 0.5f);
         } catch(IOException e) {
             LOG.error(String.format("Could not read file %s", file.toString()), e);
         } catch(SAXException e) {

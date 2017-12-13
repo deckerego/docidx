@@ -1,5 +1,6 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
@@ -11,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -25,6 +25,9 @@ import java.util.stream.Stream;
 @Service
 public class CrawlerService {
     private static final Logger LOG = LoggerFactory.getLogger(CrawlerService.class);
+
+    @Autowired
+    public CrawlerConfig crawlerConfig;
 
     @Autowired
     public TikaService tikaService;
@@ -45,30 +48,31 @@ public class CrawlerService {
         this.workBroker.handle(ParentEntry.class, this::routeFiles);
     }
 
-    @PreDestroy
-    public void debug() {
-        LOG.info(String.format("Crawled %d additions, %d modifications and %d deletions", this.addCount.get(), this.modCount.get(), this.delCount.get()));
-    }
-
-    public void crawl(String rootPath) {
-        Path cwd = FileSystems.getDefault().getPath(rootPath);
+    public void crawl() {
+        Path cwd = Paths.get(crawlerConfig.getRootPath());
         try {
             Files.walkFileTree(cwd, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
-                    if(Files.isReadable(directory)) {
-                        LOG.debug(String.format("Submitting parent entry %s", directory.toString()));
-                        workBroker.publish(new ParentEntry(directory));
-                        return FileVisitResult.CONTINUE;
-                    } else {
-                        LOG.warn(String.format("Could not read %s, skipping", directory.toAbsolutePath().toString()));
+                    try {
+                        if(crawlerConfig.getSkipHidden() && Files.isHidden(directory)) {
+                            LOG.debug(String.format("Skipping hidden directory %s", directory));
+                        } else if (Files.isReadable(directory)) {
+                            LOG.debug(String.format("Submitting parent entry %s", directory.toString()));
+                            workBroker.publish(new ParentEntry(directory));
+                        } else {
+                            LOG.warn(String.format("Could not read %s, skipping", directory.toString()));
+                        }
+                    } catch (IOException e) {
+                        LOG.error(String.format("IO Exception trying to determine attributes of %s", directory.toString()), e);
+                    } finally {
                         return FileVisitResult.CONTINUE;
                     }
                 }
 
                 @Override
                 public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                    LOG.error(String.format("Could not access %s, skipping", file.toAbsolutePath().toString()));
+                    LOG.error(String.format("Could not access %s, skipping", file.toString()));
                     return FileVisitResult.CONTINUE;
                 }
             });
@@ -87,7 +91,16 @@ public class CrawlerService {
         Map<String, Path> files = new HashMap<>();
 
         try (Stream<Path> fsStream = Files.find(path, 1, (p, a) -> a.isRegularFile())) {
-            files = fsStream.collect(Collectors.toMap(p -> p.getFileName().toString(), Function.identity()));
+            files = fsStream
+                    .filter(f -> {
+                        try {
+                            return ! (crawlerConfig.getSkipHidden() && Files.isHidden(f));
+                        } catch(IOException e) {
+                            LOG.error(String.format("IO error trying to determine if file %s is hidden", f.toString()), e);
+                            return true;
+                        }
+                    })
+                    .collect(Collectors.toMap(p -> p.getFileName().toString(), Function.identity()));
         } catch (IOException e) {
             LOG.error(String.format("Fatal exception when finding files under %s", path), e);
         }
@@ -139,4 +152,8 @@ public class CrawlerService {
                     else documentRepository.deleteAll(actions.deletions);
                 });
     }
+
+    public long getAddCount() { return this.addCount.get(); }
+    public long getModCount() { return this.modCount.get(); }
+    public long getDelCount() { return this.delCount.get(); }
 }

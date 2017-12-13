@@ -5,9 +5,6 @@ import java.nio.file.Path;
 public class ParentEntry {
     public Path directory;
 
-    public ParentEntry() {
-    }
-
     public ParentEntry(Path directory) {
         this.directory = directory;
     }

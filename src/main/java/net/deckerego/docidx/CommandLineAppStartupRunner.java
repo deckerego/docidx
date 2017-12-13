@@ -19,13 +19,19 @@ public class CommandLineAppStartupRunner implements CommandLineRunner {
     @Autowired
     private WorkBroker workBroker;
 
-    @Autowired
-    private CrawlerConfig crawlerConfig;
-
     @Override
     public void run(String... args) throws Exception {
-        crawlerService.crawl(crawlerConfig.getRootPath());
-        workBroker.awaitShutdown();
-        LOG.info("Indexing completed!");
+        long startTime = System.currentTimeMillis();
+
+        this.crawlerService.crawl();
+        this.workBroker.awaitShutdown();
+
+        long elapsedTime = System.currentTimeMillis() - startTime;
+
+        LOG.info("Indexing complete!");
+        LOG.info(String.format("Published %d and consumed %d messages in %d seconds",
+                this.workBroker.getPublishCount(), this.workBroker.getConsumedCount(), elapsedTime / 1000));
+        LOG.info(String.format("Added %d, Modified %d, Deleted %d records",
+                this.crawlerService.getAddCount(), this.crawlerService.getModCount(), this.crawlerService.getDelCount()));
     }
 }
