@@ -11,7 +11,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 
 @RunWith(SpringRunner.class)
-@SpringBootTest
+@SpringBootTest(classes = ThumbnailService.class)
 public class ThumbnailServiceTest {
 
     @Autowired
