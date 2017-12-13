@@ -1,5 +1,6 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.ParserConfig;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.TikaTask;
@@ -26,6 +27,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -37,6 +39,9 @@ public class TikaService {
 
     @Autowired
     public WorkBroker workBroker;
+
+    @Autowired
+    public CrawlerConfig crawlerConfig;
 
     @Autowired
     public ParserConfig parserConfig;
@@ -89,8 +94,11 @@ public class TikaService {
 
 
     private FileEntry parse(Path file) {
+        Path rootPath = Paths.get(crawlerConfig.getRootPath());
+        Path parentPath = rootPath.relativize(file.getParent());
+
         FileEntry entry = new FileEntry();
-        entry.parentPath = file.getParent().toString();
+        entry.parentPath = parentPath.toString();
         entry.fileName = file.getFileName().toString();
         entry.lastModified = file.toFile().lastModified();
         entry.id = DigestUtils.md5Hex(file.toString());

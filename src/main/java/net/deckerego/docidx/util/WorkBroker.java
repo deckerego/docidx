@@ -1,7 +1,10 @@
 package net.deckerego.docidx.util;
 
+import net.deckerego.docidx.configuration.BrokerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -13,31 +16,20 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
+@Component
 public class WorkBroker {
     private static final Logger LOG = LoggerFactory.getLogger(WorkBroker.class);
 
-    private int threadPoolSize;
-    private long purgeWaitMillis;
-    private long timeoutMillis;
-    private int capacity;
-    private int batchSize;
+    @Autowired
+    public BrokerConfig brokerConfig;
+
     private Map<Class, ConsumptionStrategy> consumerMap;
 
     private AtomicLong publishCount = new AtomicLong(0);
     private AtomicLong consumedCount = new AtomicLong(0);
 
-    public WorkBroker(long purgeWaitMillis, int capacity, int batchSize) {
-        this(Runtime.getRuntime().availableProcessors() / 2, purgeWaitMillis, 60 * 60 * 1000, capacity, batchSize);
-        LOG.info(String.format("Found %d available processors, provisioned %d threads in the pool", Runtime.getRuntime().availableProcessors(), this.threadPoolSize));
-    }
-
-    public WorkBroker(int threadPoolSize, long purgeWaitMillis, long timeoutMillis, int capacity, int batchSize) {
+    public WorkBroker() {
         this.consumerMap = new HashMap<>();
-        this.threadPoolSize = threadPoolSize;
-        this.timeoutMillis = timeoutMillis;
-        this.purgeWaitMillis = purgeWaitMillis;
-        this.batchSize = batchSize;
-        this.capacity = capacity;
     }
 
     public <T> void handle(Class<T> messageClass, Consumer<T> handler) {
@@ -86,6 +78,7 @@ public class WorkBroker {
     public void shutdown() {
         for(ConsumptionStrategy c : consumerMap.values())
             c.shutdown();
+        this.consumerMap.clear();
     }
 
     public void awaitShutdown() throws InterruptedException {
@@ -93,8 +86,10 @@ public class WorkBroker {
             Thread.sleep(100);
         }
         this.shutdown();
-        LOG.info(String.format("Published %d messages and consumed %d", this.publishCount.get(), this.consumedCount.get()));
     }
+
+    public long getPublishCount() { return this.publishCount.get(); }
+    public long getConsumedCount() { return this.consumedCount.get(); }
 
     private interface ConsumptionStrategy<T> {
         void consume(T message);
@@ -108,7 +103,8 @@ public class WorkBroker {
 
         public ThreadPoolStrategy(Consumer<T> handler) {
             this.threadPool =
-                    new ThreadPoolExecutor(threadPoolSize, threadPoolSize, timeoutMillis, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(capacity));
+                    new ThreadPoolExecutor(brokerConfig.getPoolThreads(), brokerConfig.getPoolThreads(),
+                            brokerConfig.getTimeout(), TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(brokerConfig.getCapacity()));
             this.handler = handler;
         }
 
@@ -129,7 +125,7 @@ public class WorkBroker {
         public void shutdown() {
             try {
                 this.threadPool.shutdown();
-                this.threadPool.awaitTermination(timeoutMillis, TimeUnit.MILLISECONDS);
+                this.threadPool.awaitTermination(brokerConfig.getTimeout(), TimeUnit.MILLISECONDS);
             } catch(InterruptedException e) {
                 LOG.error("Error while shutting down ThreadPoolStrategy", e);
             }
@@ -145,7 +141,7 @@ public class WorkBroker {
 
         public BatchStrategy(Consumer<List<T>> handler) {
             this.purgeTimer = null;
-            this.batchQueue = new ArrayBlockingQueue<>(capacity);
+            this.batchQueue = new ArrayBlockingQueue<>(brokerConfig.getCapacity());
             this.handler = handler;
         }
 
@@ -153,9 +149,9 @@ public class WorkBroker {
         public void consume(T message) {
             this.updateLock.writeLock().lock();
             if(this.purgeTimer == null) {
-                LOG.debug(String.format("Scheduling purge timer for %d", purgeWaitMillis));
+                LOG.debug(String.format("Scheduling purge timer for %d", brokerConfig.getPurgeWait()));
                 this.purgeTimer = new Timer();
-                this.purgeTimer.schedule(new PurgeTask(), purgeWaitMillis);
+                this.purgeTimer.schedule(new PurgeTask(), brokerConfig.getPurgeWait());
             }
             this.updateLock.writeLock().unlock();
 
@@ -163,8 +159,8 @@ public class WorkBroker {
                 LOG.error(String.format("Failure in trying to save message to batch queue, dropping: %s", message.toString()));
             }
 
-            if(this.batchQueue.size() >= batchSize) {
-                LOG.debug(String.format("Purging %d elements with buffer size %d", this.batchQueue.size(), batchSize));
+            if(this.batchQueue.size() >= brokerConfig.getBatchSize()) {
+                LOG.debug(String.format("Purging %d elements with buffer size %d", this.batchQueue.size(), brokerConfig.getBatchSize()));
                 purge();
             }
 
@@ -185,7 +181,7 @@ public class WorkBroker {
             if(this.batchQueue.size() <= 0) {
                 LOG.warn("Purge was requested but batch size is 0");
             } else {
-                List<T> batch = new ArrayList<>(batchSize);
+                List<T> batch = new ArrayList<>(brokerConfig.getBatchSize());
                 this.batchQueue.drainTo(batch);
                 LOG.trace(String.format("Purging %s", batch.toString()));
                 this.handler.accept(batch);
@@ -207,7 +203,7 @@ public class WorkBroker {
         private class PurgeTask extends TimerTask {
             @Override
             public void run() {
-                LOG.debug(String.format("Purging %d elements after %d seconds", batchQueue.size(), purgeWaitMillis));
+                LOG.debug(String.format("Purging %d elements after %d seconds", batchQueue.size(), brokerConfig.getPurgeWait()));
                 purge();
             }
         }

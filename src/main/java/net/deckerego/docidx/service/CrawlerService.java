@@ -1,5 +1,6 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
@@ -11,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -25,6 +25,9 @@ import java.util.stream.Stream;
 @Service
 public class CrawlerService {
     private static final Logger LOG = LoggerFactory.getLogger(CrawlerService.class);
+
+    @Autowired
+    public CrawlerConfig crawlerConfig;
 
     @Autowired
     public TikaService tikaService;
@@ -45,13 +48,8 @@ public class CrawlerService {
         this.workBroker.handle(ParentEntry.class, this::routeFiles);
     }
 
-    @PreDestroy
-    public void debug() {
-        LOG.info(String.format("Crawled %d additions, %d modifications and %d deletions", this.addCount.get(), this.modCount.get(), this.delCount.get()));
-    }
-
-    public void crawl(String rootPath) {
-        Path cwd = FileSystems.getDefault().getPath(rootPath);
+    public void crawl() {
+        Path cwd = Paths.get(crawlerConfig.getRootPath());
         try {
             Files.walkFileTree(cwd, new SimpleFileVisitor<>() {
                 @Override
@@ -61,14 +59,14 @@ public class CrawlerService {
                         workBroker.publish(new ParentEntry(directory));
                         return FileVisitResult.CONTINUE;
                     } else {
-                        LOG.warn(String.format("Could not read %s, skipping", directory.toAbsolutePath().toString()));
+                        LOG.warn(String.format("Could not read %s, skipping", directory.toString()));
                         return FileVisitResult.CONTINUE;
                     }
                 }
 
                 @Override
                 public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                    LOG.error(String.format("Could not access %s, skipping", file.toAbsolutePath().toString()));
+                    LOG.error(String.format("Could not access %s, skipping", file.toString()));
                     return FileVisitResult.CONTINUE;
                 }
             });
@@ -139,4 +137,8 @@ public class CrawlerService {
                     else documentRepository.deleteAll(actions.deletions);
                 });
     }
+
+    public long getAddCount() { return this.addCount.get(); }
+    public long getModCount() { return this.modCount.get(); }
+    public long getDelCount() { return this.delCount.get(); }
 }

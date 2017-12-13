@@ -1,5 +1,6 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
@@ -41,9 +42,14 @@ public class CrawlerServiceTests {
     @Autowired
     private CrawlerService crawlerService;
 
+    @MockBean
+    private CrawlerConfig crawlerConfig;
+
     @Test
     public void directoryStreamCollector() {
-        this.crawlerService.crawl("tests");
+        when(crawlerConfig.getRootPath()).thenReturn("tests");
+
+        this.crawlerService.crawl();
 
         then(this.workBroker).should().publish(any(ParentEntry.class));
     }
