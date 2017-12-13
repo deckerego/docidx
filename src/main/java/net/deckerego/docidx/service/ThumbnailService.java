@@ -1,7 +1,5 @@
 package net.deckerego.docidx.service;
 
-import org.apache.commons.imaging.ImageReadException;
-import org.apache.commons.imaging.Imaging;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.slf4j.Logger;
@@ -57,9 +55,6 @@ public class ThumbnailService {
     private BufferedImage renderImage(File file, float scale) throws IOException {
         float finalScale = scale / 2; // Double the reduction in scale. Because I said so.
 
-        //TODO Until https://issues.apache.org/jira/browse/IMAGING-97 is fixed
-        //I can't rely on commons-imaging, and so I'm stuck with javax,
-        //and so OpenJDK 9 will fail since it exlucdes the java.desktop module
         BufferedImage image = ImageIO.read(file);
         BufferedImage transformedImage =
                 new BufferedImage((int)(image.getWidth() * finalScale), (int)(image.getHeight() * finalScale), BufferedImage.TYPE_INT_ARGB);
