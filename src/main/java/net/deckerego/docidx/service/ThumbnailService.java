@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.ImageIO;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
@@ -36,9 +37,6 @@ public class ThumbnailService {
         } catch(IOException e) {
             LOG.error(String.format("Couldn't generate thumbnail for %s type %s", file.toString(), type), e);
             image = blankImage;
-        } catch(ImageReadException e) {
-            LOG.error(String.format("Couldn't read file %s type %s to generate thumbnail", file.toString(), type), e);
-            image = blankImage;
         }
 
         if(image != null && image.getHeight() >= 32) {
@@ -56,10 +54,13 @@ public class ThumbnailService {
         return image;
     }
 
-    private BufferedImage renderImage(File file, float scale) throws IOException, ImageReadException {
+    private BufferedImage renderImage(File file, float scale) throws IOException {
         float finalScale = scale / 2; // Double the reduction in scale. Because I said so.
 
-        BufferedImage image = Imaging.getBufferedImage(file);
+        //TODO Until https://issues.apache.org/jira/browse/IMAGING-97 is fixed
+        //I can't rely on commons-imaging, and so I'm stuck with javax,
+        //and so OpenJDK 9 will fail since it exlucdes the java.desktop module
+        BufferedImage image = ImageIO.read(file);
         BufferedImage transformedImage =
                 new BufferedImage((int)(image.getWidth() * finalScale), (int)(image.getHeight() * finalScale), BufferedImage.TYPE_INT_ARGB);
 
