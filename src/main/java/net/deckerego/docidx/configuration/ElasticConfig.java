@@ -1,9 +1,13 @@
 package net.deckerego.docidx.configuration;
 
+import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.client.transport.NoNodeAvailableException;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +22,8 @@ import java.net.UnknownHostException;
 @ConfigurationProperties(prefix = "elasticsearch")
 @EnableElasticsearchRepositories("net.deckerego.docidx.repository")
 public class ElasticConfig {
+    private static final Logger LOG = LoggerFactory.getLogger(ElasticConfig.class);
+
     private String host;
     private int port;
     private String cluster;
@@ -35,6 +41,20 @@ public class ElasticConfig {
     public void setBatchWaitMillis(long batchWaitMillis) { this.batchWaitMillis = batchWaitMillis; }
     public long getBatchWaitMillis() { return this.batchWaitMillis; }
 
+    private void waitForClientConnection(Client client) throws InterruptedException {
+        boolean portClosed = true;
+
+        while(portClosed) {
+            try {
+                client.admin().cluster().health(new ClusterHealthRequest());
+                portClosed = false;
+            } catch (NoNodeAvailableException e) {
+                LOG.warn(String.format("Could not connect to %s:%d, retrying...", host, port));
+                Thread.sleep(1000);
+            }
+        }
+    }
+
     @Bean
     ElasticsearchOperations elasticsearchTemplate() throws UnknownHostException {
         Settings settings = Settings.builder()
@@ -42,6 +62,13 @@ public class ElasticConfig {
                 .build();
         Client client = new PreBuiltTransportClient(settings)
                 .addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(host), port));
+
+        try {
+            waitForClientConnection(client);
+        } catch(InterruptedException e) {
+            LOG.error(String.format("Couldn't wait to connect to %s:%d", host, port), e);
+        }
+
         return new ElasticsearchTemplate(client);
     }
 }
