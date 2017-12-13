@@ -54,12 +54,18 @@ public class CrawlerService {
             Files.walkFileTree(cwd, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
-                    if(Files.isReadable(directory)) {
-                        LOG.debug(String.format("Submitting parent entry %s", directory.toString()));
-                        workBroker.publish(new ParentEntry(directory));
-                        return FileVisitResult.CONTINUE;
-                    } else {
-                        LOG.warn(String.format("Could not read %s, skipping", directory.toString()));
+                    try {
+                        if(crawlerConfig.getSkipHidden() && Files.isHidden(directory)) {
+                            LOG.debug(String.format("Skipping hidden directory %s", directory));
+                        } else if (Files.isReadable(directory)) {
+                            LOG.debug(String.format("Submitting parent entry %s", directory.toString()));
+                            workBroker.publish(new ParentEntry(directory));
+                        } else {
+                            LOG.warn(String.format("Could not read %s, skipping", directory.toString()));
+                        }
+                    } catch (IOException e) {
+                        LOG.error(String.format("IO Exception trying to determine attributes of %s", directory.toString()), e);
+                    } finally {
                         return FileVisitResult.CONTINUE;
                     }
                 }
@@ -85,7 +91,16 @@ public class CrawlerService {
         Map<String, Path> files = new HashMap<>();
 
         try (Stream<Path> fsStream = Files.find(path, 1, (p, a) -> a.isRegularFile())) {
-            files = fsStream.collect(Collectors.toMap(p -> p.getFileName().toString(), Function.identity()));
+            files = fsStream
+                    .filter(f -> {
+                        try {
+                            return ! (crawlerConfig.getSkipHidden() && Files.isHidden(f));
+                        } catch(IOException e) {
+                            LOG.error(String.format("IO error trying to determine if file %s is hidden", f.toString()), e);
+                            return true;
+                        }
+                    })
+                    .collect(Collectors.toMap(p -> p.getFileName().toString(), Function.identity()));
         } catch (IOException e) {
             LOG.error(String.format("Fatal exception when finding files under %s", path), e);
         }
