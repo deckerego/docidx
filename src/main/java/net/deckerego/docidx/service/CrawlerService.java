@@ -51,7 +51,7 @@ public class CrawlerService {
     public void crawl() {
         Path cwd = Paths.get(crawlerConfig.getRootPath());
         try {
-            Files.walkFileTree(cwd, new SimpleFileVisitor<>() {
+            Files.walkFileTree(cwd, new SimpleFileVisitor<Path>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) {
                     try {
