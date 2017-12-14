@@ -11,8 +11,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit4.SpringRunner;
 
-import java.nio.file.FileSystems;
-import java.util.List;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
@@ -38,7 +39,8 @@ public class TikaServiceTests {
     @Test
     public void submitFiles() {
         when(crawlerConfig.getRootPath()).thenReturn(".");
-        this.tikaSvc.submit(List.of(FileSystems.getDefault().getPath("./README.md")), e -> assertThat(e).isNotNull());
+        Path[] files = { Paths.get("./README.md") };
+        this.tikaSvc.submit(Arrays.asList(files), e -> assertThat(e).isNotNull());
         then(this.workBroker).should().publish(any(TikaTask.class));
     }
 }
