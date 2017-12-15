@@ -23,14 +23,12 @@ import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
 
 import javax.annotation.PostConstruct;
-import java.awt.image.BufferedImage;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.function.Consumer;
 
@@ -108,21 +106,14 @@ public class TikaService {
 
         ContentHandler body = new BodyContentHandler();
         Metadata metadata = new Metadata();
+
         try {
             InputStream fis = new FileInputStream(file.toFile());
             documentParser.parse(fis, body, metadata, parserContext);
-
-            entry.body = body.toString();
-            entry.metadata = new HashMap<>();
-            for (String prop : metadata.names())
-                entry.metadata.put(prop, metadata.get(prop));
-
-            String contentType = entry.metadata.getOrDefault("Content-Type", "application/octet-stream");
-            entry.thumbnail = thumbnailService.render(file.toFile(), contentType, 0.5f);
         } catch(IOException e) {
             LOG.error(String.format("Could not read file %s", file.toString()), e);
         } catch(SAXException e) {
-            LOG.error(String.format("Error parsing %s to XML", file.toString()), e);
+            LOG.warn(String.format("Error parsing %s to XML", file.toString()), e);
         } catch(TikaException e) {
             LOG.error(String.format("Error parsing file %s", file.toString()), e);
         } finally {
@@ -130,7 +121,11 @@ public class TikaService {
             entry.metadata = new HashMap<>();
             for (String prop : metadata.names())
                 entry.metadata.put(prop, metadata.get(prop));
-            return entry;
+
+            String contentType = entry.metadata.getOrDefault("Content-Type", "application/octet-stream");
+            entry.thumbnail = thumbnailService.render(file.toFile(), contentType, 0.5f);
         }
+
+        return entry;
     }
 }

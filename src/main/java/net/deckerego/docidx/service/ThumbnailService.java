@@ -1,5 +1,6 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.model.FileEntry;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.slf4j.Logger;
@@ -17,7 +18,6 @@ import java.io.IOException;
 @Service
 public class ThumbnailService {
     private static final Logger LOG = LoggerFactory.getLogger(ThumbnailService.class);
-    private final BufferedImage blankImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
 
     BufferedImage render(File file, String type, float scale) {
         BufferedImage image;
@@ -30,11 +30,11 @@ public class ThumbnailService {
                     || type.contains(MediaType.IMAGE_GIF_VALUE)) {
                 image = renderImage(file, scale);
             } else {
-                image = blankImage;
+                image = FileEntry.blankImage;
             }
         } catch(IOException e) {
             LOG.error(String.format("Couldn't generate thumbnail for %s type %s", file.toString(), type), e);
-            image = blankImage;
+            image = FileEntry.blankImage;
         }
 
         if(image != null && image.getHeight() >= 32) {
