@@ -200,9 +200,10 @@ public class CrawlerServiceTests {
         results.add(existing01);
         results.add(existing02);
 
-        when(documentRepository.findByParentPath("tests")).thenReturn(results);
+        when(crawlerConfig.getRootPath()).thenReturn("tests");
+        when(documentRepository.findByParentPath("cheddars")).thenReturn(results);
 
-        Path parent = FileSystems.getDefault().getPath("tests");
+        Path parent = FileSystems.getDefault().getPath("tests/cheddars");
         Map<String, FileEntry> docs = crawlerService.getDocuments(parent);
 
         assertThat(docs.size()).isEqualTo(2);
