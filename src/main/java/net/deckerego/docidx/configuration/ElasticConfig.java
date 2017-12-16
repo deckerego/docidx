@@ -4,7 +4,7 @@ import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.transport.NoNodeAvailableException;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.common.transport.TransportAddress;
 import org.elasticsearch.transport.client.PreBuiltTransportClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +49,8 @@ public class ElasticConfig {
                 client.admin().cluster().health(new ClusterHealthRequest());
                 portClosed = false;
             } catch (NoNodeAvailableException e) {
-                LOG.warn(String.format("Could not connect to %s:%d, retrying...", host, port));
+                if(LOG.isDebugEnabled()) LOG.warn(String.format("Could not connect to %s:%d, retrying...", host, port), e);
+                else LOG.warn(String.format("Could not connect to %s:%d, retrying...", host, port));
                 Thread.sleep(1000);
             }
         }
@@ -61,7 +62,7 @@ public class ElasticConfig {
                 .put("cluster.name", cluster)
                 .build();
         Client client = new PreBuiltTransportClient(settings)
-                .addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(host), port));
+                .addTransportAddress(new TransportAddress(InetAddress.getByName(host), port));
 
         try {
             waitForClientConnection(client);
