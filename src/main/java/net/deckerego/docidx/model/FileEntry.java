@@ -3,10 +3,7 @@ package net.deckerego.docidx.model;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.annotation.Id;
-import org.springframework.data.elasticsearch.annotations.Document;
-import org.springframework.data.elasticsearch.annotations.Field;
-import org.springframework.data.elasticsearch.annotations.FieldType;
-import org.springframework.data.elasticsearch.annotations.Mapping;
+import org.springframework.data.elasticsearch.annotations.*;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -19,8 +16,9 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-@Document(indexName = "docidx", type = "fileentry", replicas = 0)
-@Mapping
+@Document(indexName = "docidx", type = "fileentry")
+@Mapping(mappingPath = "fileentry-mapping.json")
+@Setting(settingPath = "docidx-settings.json")
 public class FileEntry {
     private static final Logger LOG = LoggerFactory.getLogger(FileEntry.class);
     public static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
@@ -28,17 +26,11 @@ public class FileEntry {
 
     @Id
     public String id;
-    @Field(type = FieldType.text)
     public String parentPath;
-    @Field(type = FieldType.text)
     public String fileName;
-    @Field(type = FieldType.Date)
     public Long lastModified;
-    @Field(type = FieldType.text)
     public String body;
-    @Field(type = FieldType.Nested)
     public Map<String, String> metadata;
-    @Field(type = FieldType.text, index = false)
     public BufferedImage thumbnail;
 
     public FileEntry() {
