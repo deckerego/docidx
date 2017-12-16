@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.function.Consumer;
 
@@ -101,7 +102,7 @@ public class TikaService {
         FileEntry entry = new FileEntry();
         entry.parentPath = parentPath.toString();
         entry.fileName = file.getFileName().toString();
-        entry.lastModified = file.toFile().lastModified();
+        entry.lastModified = new Date(file.toFile().lastModified());
         entry.id = DigestUtils.md5Hex(file.toString());
 
         ContentHandler body = new BodyContentHandler();

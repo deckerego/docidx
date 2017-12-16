@@ -21,14 +21,13 @@ import java.util.Map;
 @Setting(settingPath = "docidx-settings.json")
 public class FileEntry {
     private static final Logger LOG = LoggerFactory.getLogger(FileEntry.class);
-    public static final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
     public static final BufferedImage blankImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
 
     @Id
     public String id;
     public String parentPath;
     public String fileName;
-    public Long lastModified;
+    public Date lastModified;
     public String body;
     public Map<String, String> metadata;
     public BufferedImage thumbnail;
@@ -37,26 +36,10 @@ public class FileEntry {
         this.id = "NOENTRY";
         this.parentPath = "";
         this.fileName = "";
-        this.lastModified = new Long(0L);
+        this.lastModified = new Date(0L);
         this.body = "";
         this.metadata = new HashMap<>(0);
         this.thumbnail = blankImage;
-    }
-
-    public String getLastModified() {
-        return dateFormat.format(new Date(this.lastModified));
-    }
-
-    public void setLastModified(String lastModified) {
-        try {
-            this.lastModified = dateFormat.parse(lastModified).getTime();
-        } catch(NumberFormatException e) {
-            LOG.warn(String.format("Couldn't parse lastModified %s for ID %s, defaulting to epoch", lastModified, this.id), e);
-            this.lastModified = new Long(0);
-        } catch(ParseException e) {
-            LOG.error(String.format("Couldn't deserialize lastModified %s for ID %s", lastModified, this.id), e);
-            this.lastModified = new Long(0);
-        }
     }
 
     public byte[] getThumbnail() {

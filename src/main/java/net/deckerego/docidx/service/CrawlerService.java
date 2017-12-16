@@ -82,8 +82,11 @@ public class CrawlerService {
     }
 
     public Map<String, FileEntry> getDocuments(Path path) {
-        List<FileEntry> files = this.documentRepository.findByParentPath(path.toString());
-        LOG.debug(String.format("Found %d documents for %s", files.size(), path.toString()));
+        Path rootPath = Paths.get(crawlerConfig.getRootPath());
+        Path parentPath = rootPath.relativize(path);
+
+        List<FileEntry> files = this.documentRepository.findByParentPath(parentPath.toString());
+        LOG.debug(String.format("Found %d documents for %s", files.size(), parentPath.toString()));
         return files.stream().collect(Collectors.toMap(e -> e.fileName, Function.identity()));
     }
 
@@ -109,6 +112,11 @@ public class CrawlerService {
         return files;
     }
 
+    private boolean isBefore(FileEntry document, Path file) {
+        Date fileLastModified = new Date(file.toFile().lastModified());
+        return document.lastModified.before(fileLastModified);
+    }
+
     public DocumentActions merge(Path parent, Map<String, FileEntry> documents, Map<String, Path> files) {
         DocumentActions actions = new DocumentActions(parent);
 
@@ -119,7 +127,7 @@ public class CrawlerService {
         LOG.debug(String.format("Found %d additions for %s", actions.additions.size(), parent.getFileName().toString()));
 
         actions.updates = files.keySet().stream()
-                .filter(f -> documents.containsKey(f) && documents.get(f).lastModified < files.get(f).toFile().lastModified())
+                .filter(f -> documents.containsKey(f) && isBefore(documents.get(f), files.get(f)))
                 .map(files::get).collect(Collectors.toSet());
         modCount.addAndGet(actions.updates.size());
         LOG.debug(String.format("Found %d updates for %s", actions.updates.size(), parent.getFileName().toString()));
