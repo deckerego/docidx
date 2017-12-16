@@ -17,10 +17,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import java.io.File;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.then;
@@ -58,13 +55,13 @@ public class CrawlerServiceTests {
     @Test
     public void testMergeEverything() {
         FileEntry deletion01 = new FileEntry();
-        deletion01.lastModified = 123412543124L;
+        deletion01.lastModified = new Date(123412543124L);
         deletion01.parentPath = "tests";
         deletion01.fileName = "deletion01.pdf";
         deletion01.id = "FEEDFACE33373";
 
         FileEntry existing01 = new FileEntry();
-        existing01.lastModified = 123412543024L;
+        existing01.lastModified = new Date(123412543024L);
         existing01.parentPath = "tests";
         existing01.fileName = "existing01.pdf";
         existing01.id = "FEEDFACE33773";
@@ -109,7 +106,7 @@ public class CrawlerServiceTests {
     @Test
     public void testMergeDeletions() {
         FileEntry deletion01 = new FileEntry();
-        deletion01.lastModified = 123412543124L;
+        deletion01.lastModified = new Date(123412543124L);
         deletion01.parentPath = "tests";
         deletion01.fileName = "deletion01.pdf";
         deletion01.id = "FEEDFACE33373";
@@ -133,7 +130,7 @@ public class CrawlerServiceTests {
     @Test
     public void testMergeModifications() {
         FileEntry existing01 = new FileEntry();
-        existing01.lastModified = 123412543124L;
+        existing01.lastModified = new Date(123412543124L);
         existing01.parentPath = "tests";
         existing01.fileName = "existing01.pdf";
         existing01.id = "FEEDFACE33373";
@@ -188,13 +185,13 @@ public class CrawlerServiceTests {
     @Test
     public void testGetDocuments() {
         FileEntry existing01 = new FileEntry();
-        existing01.lastModified = 123412543124L;
+        existing01.lastModified = new Date(123412543124L);
         existing01.parentPath = "tests";
         existing01.fileName = "existing01.pdf";
         existing01.id = "FEEDFACE33373";
 
         FileEntry existing02 = new FileEntry();
-        existing02.lastModified = 123412543114L;
+        existing02.lastModified = new Date(123412543114L);
         existing02.parentPath = "tests";
         existing02.fileName = "existing02.pdf";
         existing02.id = "FEEDFACE33374";

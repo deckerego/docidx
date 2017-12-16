@@ -49,7 +49,8 @@ public class ElasticConfig {
                 client.admin().cluster().health(new ClusterHealthRequest());
                 portClosed = false;
             } catch (NoNodeAvailableException e) {
-                LOG.warn(String.format("Could not connect to %s:%d, retrying...", host, port));
+                if(LOG.isDebugEnabled()) LOG.warn(String.format("Could not connect to %s:%d, retrying...", host, port), e);
+                else LOG.warn(String.format("Could not connect to %s:%d, retrying...", host, port));
                 Thread.sleep(1000);
             }
         }
