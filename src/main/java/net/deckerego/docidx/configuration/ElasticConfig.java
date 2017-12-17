@@ -29,6 +29,7 @@ public class ElasticConfig {
     private String cluster;
     private int batchSize = 10;
     private long batchWaitMillis = 10000;
+    private int maxResults = 10000;
 
     public void setHost(String host) { this.host = host; }
     public String getHost() { return this.host; }
@@ -40,6 +41,8 @@ public class ElasticConfig {
     public int getBatchSize() { return this.batchSize; }
     public void setBatchWaitMillis(long batchWaitMillis) { this.batchWaitMillis = batchWaitMillis; }
     public long getBatchWaitMillis() { return this.batchWaitMillis; }
+    public void setMaxResults(int maxResults) { this.maxResults = maxResults; }
+    public int getMaxResults() { return this.maxResults; }
 
     private void waitForClientConnection(Client client) throws InterruptedException {
         boolean portClosed = true;

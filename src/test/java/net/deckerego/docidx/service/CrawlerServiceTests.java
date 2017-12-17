@@ -1,6 +1,7 @@
 package net.deckerego.docidx.service;
 
 import net.deckerego.docidx.configuration.CrawlerConfig;
+import net.deckerego.docidx.configuration.ElasticConfig;
 import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
@@ -11,7 +12,9 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.data.elasticsearch.core.ElasticsearchTemplate;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.io.File;
@@ -42,6 +45,9 @@ public class CrawlerServiceTests {
 
     @MockBean
     private CrawlerConfig crawlerConfig;
+
+    @MockBean
+    private ElasticConfig elasticConfig;
 
     @Test
     public void directoryStreamCollector() {
@@ -200,8 +206,11 @@ public class CrawlerServiceTests {
         results.add(existing01);
         results.add(existing02);
 
+        Page<FileEntry> resultsPage = new PageImpl<>(results);
+
         when(crawlerConfig.getRootPath()).thenReturn("tests");
-        when(documentRepository.findByParentPath("cheddars")).thenReturn(results);
+        when(this.elasticConfig.getMaxResults()).thenReturn(10);
+        when(documentRepository.findByParentPath(eq("cheddars"), any(Pageable.class))).thenReturn(resultsPage);
 
         Path parent = FileSystems.getDefault().getPath("tests/cheddars");
         Map<String, FileEntry> docs = crawlerService.getDocuments(parent);

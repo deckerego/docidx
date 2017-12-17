@@ -81,11 +81,10 @@ public class WorkBroker {
         this.consumerMap.clear();
     }
 
-    public void awaitShutdown() throws InterruptedException {
+    public void waitUntilComplete() throws InterruptedException {
         while(this.taskCount() > 0) {
             Thread.sleep(100);
         }
-        this.shutdown();
     }
 
     public long getPublishCount() { return this.publishCount.get(); }

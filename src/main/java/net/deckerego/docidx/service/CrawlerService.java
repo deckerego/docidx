@@ -1,6 +1,7 @@
 package net.deckerego.docidx.service;
 
 import net.deckerego.docidx.configuration.CrawlerConfig;
+import net.deckerego.docidx.configuration.ElasticConfig;
 import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
@@ -9,6 +10,8 @@ import net.deckerego.docidx.util.WorkBroker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
@@ -17,6 +20,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -28,6 +32,9 @@ public class CrawlerService {
 
     @Autowired
     public CrawlerConfig crawlerConfig;
+
+    @Autowired
+    public ElasticConfig elasticConfig;
 
     @Autowired
     public TikaService tikaService;
@@ -85,9 +92,25 @@ public class CrawlerService {
         Path rootPath = Paths.get(crawlerConfig.getRootPath());
         Path parentPath = rootPath.relativize(path);
 
-        List<FileEntry> files = this.documentRepository.findByParentPath(parentPath.toString());
-        LOG.debug(String.format("Found %d documents for %s", files.size(), parentPath.toString()));
-        return files.stream().collect(Collectors.toMap(e -> e.fileName, Function.identity()));
+        //Stream support is really weird in Spring Data ES right now, so fall back to Pageable
+        Map<String, FileEntry> fileMap = new HashMap<>();
+        int currentPage = 0;
+
+        //Fetch the first page
+        PageRequest pageable = PageRequest.of(currentPage++, elasticConfig.getMaxResults());
+        Page<FileEntry> files = this.documentRepository.findByParentPath(parentPath.toString(), pageable);
+        files.forEach(f -> fileMap.put(f.fileName, f));
+
+        //Fetch any additional pages
+        while(currentPage < files.getTotalPages()) {
+            LOG.debug(String.format("Found over %d document results, fetching page %d", elasticConfig.getMaxResults(), currentPage));
+            pageable = PageRequest.of(currentPage++, elasticConfig.getMaxResults());
+            files = this.documentRepository.findByParentPath(parentPath.toString(), pageable);
+            files.forEach(f -> fileMap.put(f.fileName, f));
+        }
+
+        LOG.debug(String.format("Found %d documents for %s", fileMap.size(), parentPath.toString()));
+        return fileMap;
     }
 
     public Map<String, Path> getFiles(Path path) {
@@ -146,19 +169,28 @@ public class CrawlerService {
         CompletableFuture<Map<String, Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(parent.directory));
         CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p));
 
-        futureEntries
-                .whenComplete((actions, ex) -> {
-                    if(ex != null) LOG.error(String.format("Error mapping additions for %s", parent.toString()), ex);
-                    else tikaService.submit(actions.additions, workBroker::publish);
-                })
-                .whenComplete((actions, ex) -> {
-                    if(ex != null) LOG.error(String.format("Error mapping updates for %s", parent.toString()), ex);
-                    else tikaService.submit(actions.updates, workBroker::publish);
-                })
-                .whenComplete((actions, ex) -> {
-                    if(ex != null) LOG.error(String.format("Error mapping deletions for %s", parent.toString()), ex);
-                    else documentRepository.deleteAll(actions.deletions);
-                });
+        try {
+            futureEntries
+                    .whenComplete((actions, ex) -> {
+                        if (ex != null)
+                            LOG.error(String.format("Error mapping additions for %s", parent.toString()), ex);
+                        else tikaService.submit(actions.additions, workBroker::publish);
+                    })
+                    .whenComplete((actions, ex) -> {
+                        if (ex != null) LOG.error(String.format("Error mapping updates for %s", parent.toString()), ex);
+                        else tikaService.submit(actions.updates, workBroker::publish);
+                    })
+                    .whenComplete((actions, ex) -> {
+                        if (ex != null)
+                            LOG.error(String.format("Error mapping deletions for %s", parent.toString()), ex);
+                        else documentRepository.deleteAll(actions.deletions);
+                    })
+                    .get(); // I just like the composition.
+        } catch(InterruptedException e) {
+            LOG.error(String.format("Interrupted while routing files for %s", parent.toString()), e);
+        } catch(ExecutionException e) {
+            LOG.error(String.format("Error when trying to route files for %s", parent.toString()), e);
+        }
     }
 
     public long getAddCount() { return this.addCount.get(); }

@@ -53,7 +53,7 @@ public class WorkBrokerTests {
         });
 
         broker.publish(new TestMessage());
-        broker.awaitShutdown();
+        broker.waitUntilComplete();
 
         assertThat(callCount.get()).isEqualTo(1);
     }
@@ -78,7 +78,7 @@ public class WorkBrokerTests {
         testMsg.id = "TESTING";
 
         broker.publish(testMsg);
-        broker.awaitShutdown();
+        broker.waitUntilComplete();
 
         assertThat(callCount.get()).isEqualTo(1);
     }
@@ -99,7 +99,7 @@ public class WorkBrokerTests {
         });
 
         broker.publish(new TestMessage());
-        broker.awaitShutdown();
+        broker.waitUntilComplete();
 
         assertThat(callCount.get()).isEqualTo(1);
     }
