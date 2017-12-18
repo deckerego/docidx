@@ -56,6 +56,12 @@ public class CrawlerService {
     }
 
     public void crawl() {
+        //Reset our diagnostic counters
+        this.addCount.set(0L);
+        this.modCount.set(0L);
+        this.delCount.set(0L);
+
+        //Walk the given directory and issue ParentEntry messages for later processing
         Path cwd = Paths.get(crawlerConfig.getRootPath());
         try {
             Files.walkFileTree(cwd, new SimpleFileVisitor<Path>() {
@@ -170,6 +176,7 @@ public class CrawlerService {
         CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p));
 
         try {
+            //Send out FileEntry messages for deletion or Path messages for additions/updates
             futureEntries
                     .whenComplete((actions, ex) -> {
                         if (ex != null)
