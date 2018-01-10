@@ -12,4 +12,4 @@ VOLUME /mnt/docs
 
 WORKDIR /opt/docidx
 
-ENTRYPOINT [ "java", "-jar", "docidx.jar"]
+ENTRYPOINT [ "java", "-Djava.library.path=/opt/opencv/3.4.0/share/OpenCV/java/", "-jar", "docidx.jar"]

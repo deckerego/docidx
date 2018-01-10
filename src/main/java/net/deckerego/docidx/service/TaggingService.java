@@ -25,6 +25,10 @@ import java.util.Map;
 public class TaggingService {
     private static final Logger LOG = LoggerFactory.getLogger(TaggingService.class);
 
+    static {
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+    }
+
     @Autowired
     public TagTemplateRepository tagTemplateRepository;
 
@@ -57,7 +61,7 @@ public class TaggingService {
             Imgproc.matchTemplate(targetImage, entry.getKey(), result, Imgproc.TM_CCOEFF_NORMED);
             Core.normalize( result, result, 0, 1, Core.NORM_MINMAX, -1, new Mat() );
             Core.MinMaxLocResult location = Core.minMaxLoc(result);
-            LOG.debug(String.format("Found template match at max(%d, %d), min(%d, %d)",
+            LOG.debug(String.format("Found template match at max(%f, %f), min(%f, %f)",
                     location.maxLoc.x, location.maxLoc.y, location.minLoc.x, location.minLoc.y));
 
             //FIXME Just a pretend value for now until we figure out what location should be
