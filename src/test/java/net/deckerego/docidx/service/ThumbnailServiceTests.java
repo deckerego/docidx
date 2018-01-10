@@ -12,7 +12,7 @@ import java.io.File;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = ThumbnailService.class)
-public class ThumbnailServiceTest {
+public class ThumbnailServiceTests {
 
     @Autowired
     private ThumbnailService thumbSvc;
