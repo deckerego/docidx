@@ -5,7 +5,7 @@
 
 	<groupId>net.deckerego</groupId>
 	<artifactId>docidx</artifactId>
-	<version>0.1.0</version>
+	<version>0.2.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<name>DocIndex</name>
@@ -65,6 +65,12 @@
 		</dependency>
 
 		<dependency>
+			<groupId>org.opencv</groupId>
+			<artifactId>opencv</artifactId>
+			<version>3.4.0</version>
+		</dependency>
+
+		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
@@ -81,6 +87,11 @@
 	</build>
 
 	<repositories>
+        <repository>
+            <id>local</id>
+            <name>Local Project Libraries</name>
+            <url>file://${project.basedir}/lib</url>
+        </repository>
 		<repository>
 			<id>spring-snapshots</id>
 			<name>Spring Snapshots</name>
