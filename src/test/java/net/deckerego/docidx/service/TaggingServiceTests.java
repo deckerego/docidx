@@ -29,14 +29,14 @@ public class TaggingServiceTests {
 
     @Test
     public void positiveMatch() {
-        File template = new File(System.getProperty("user.dir"), "src/test/docs/test.jpg");
+        File template = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
         Mat templateImage = Imgcodecs.imread(template.getAbsolutePath());
         Map<Mat, String> templates = new HashMap<>();
         templates.put(templateImage, "myTag");
         when(tagTemplateRepository.getAllTemplates()).thenReturn(templates);
 
-        File file = new File(System.getProperty("user.dir"), "src/test/docs/test.jpg");
-        String tag = taggingService.tag(file, "image/jpeg");
+        File file = new File(System.getProperty("user.dir"), "src/test/docs/test.png");
+        String tag = taggingService.tag(file, "image/png");
 
         Assertions.assertThat(tag).isEqualTo("myTag");
     }
