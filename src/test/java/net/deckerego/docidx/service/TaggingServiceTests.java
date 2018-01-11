@@ -14,6 +14,7 @@ import org.springframework.test.context.junit4.SpringRunner;
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static org.mockito.BDDMockito.*;
 
@@ -28,7 +29,7 @@ public class TaggingServiceTests {
     private TagTemplateRepository tagTemplateRepository;
 
     @Test
-    public void positiveMatch() {
+    public void positiveMatchPNG() {
         File template = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
         Mat templateImage = Imgcodecs.imread(template.getAbsolutePath());
         Map<Mat, String> templates = new HashMap<>();
@@ -36,8 +37,50 @@ public class TaggingServiceTests {
         when(tagTemplateRepository.getAllTemplates()).thenReturn(templates);
 
         File file = new File(System.getProperty("user.dir"), "src/test/docs/test.png");
-        String tag = taggingService.tag(file, "image/png");
+        Set<String> tags = taggingService.tag(file, "image/png");
 
-        Assertions.assertThat(tag).isEqualTo("myTag");
+        Assertions.assertThat(tags).contains("myTag");
+    }
+
+    @Test
+    public void positiveMatchPDF() {
+        File template = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
+        Mat templateImage = Imgcodecs.imread(template.getAbsolutePath());
+        Map<Mat, String> templates = new HashMap<>();
+        templates.put(templateImage, "myTag");
+        when(tagTemplateRepository.getAllTemplates()).thenReturn(templates);
+
+        File file = new File(System.getProperty("user.dir"), "src/test/docs/test.pdf");
+        Set<String> tags = taggingService.tag(file, "application/pdf");
+
+        Assertions.assertThat(tags).contains("myTag");
+    }
+
+    @Test
+    public void negativeMatchExpectedDimensions() {
+        File template = new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png");
+        Mat templateImage = Imgcodecs.imread(template.getAbsolutePath());
+        Map<Mat, String> templates = new HashMap<>();
+        templates.put(templateImage, "myTag");
+        when(tagTemplateRepository.getAllTemplates()).thenReturn(templates);
+
+        File file = new File(System.getProperty("user.dir"), "src/test/docs/test.pdf");
+        Set<String> tags = taggingService.tag(file, "application/pdf");
+
+        Assertions.assertThat(tags).doesNotContain("myTag");
+    }
+
+    @Test
+    public void negativeMatchMismatchedDimensions() {
+        File template = new File(System.getProperty("user.dir"), "src/test/docs/template_bad_big.png");
+        Mat templateImage = Imgcodecs.imread(template.getAbsolutePath());
+        Map<Mat, String> templates = new HashMap<>();
+        templates.put(templateImage, "myTag");
+        when(tagTemplateRepository.getAllTemplates()).thenReturn(templates);
+
+        File file = new File(System.getProperty("user.dir"), "src/test/docs/test.pdf");
+        Set<String> tags = taggingService.tag(file, "application/pdf");
+
+        Assertions.assertThat(tags).doesNotContain("myTag");
     }
 }

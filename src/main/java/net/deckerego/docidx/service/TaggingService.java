@@ -4,8 +4,8 @@ import net.deckerego.docidx.repository.TagTemplateRepository;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.opencv.core.Core;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
@@ -19,7 +19,9 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class TaggingService {
@@ -32,9 +34,10 @@ public class TaggingService {
     @Autowired
     public TagTemplateRepository tagTemplateRepository;
 
-    public String tag(File file, String type) {
+    public Set<String> tag(File file, String type) {
         LOG.trace(String.format("Attempting to tag file %s", file.getAbsolutePath()));
         Mat targetImage = null;
+        Set<String> tags = new HashSet<>();
 
         try {
             if (type.contains(MediaType.APPLICATION_PDF_VALUE)) {
@@ -43,9 +46,11 @@ public class TaggingService {
                     || type.contains(MediaType.IMAGE_PNG_VALUE)
                     || type.contains(MediaType.IMAGE_GIF_VALUE)) {
                 targetImage = renderImage(file);
+            } else {
+                LOG.error(String.format("Couldn't render target image for %s type %s", file.toString(), type));
             }
         } catch(IOException e) {
-            LOG.error(String.format("Couldn't generate target image for %s type %s", file.toString()), e);
+            LOG.error(String.format("Couldn't generate target image for %s type %s", file.toString(), type), e);
         }
 
         if(targetImage == null) {
@@ -53,22 +58,29 @@ public class TaggingService {
             return null;
         }
 
-        String bestTag = null;
-
         //TODO Move to fork/join or stream
         for (Map.Entry<Mat, String> entry : tagTemplateRepository.getAllTemplates().entrySet()) {
-            Mat result = new Mat();
-            Imgproc.matchTemplate(targetImage, entry.getKey(), result, Imgproc.TM_CCOEFF_NORMED);
-            Core.normalize( result, result, 0, 1, Core.NORM_MINMAX, -1, new Mat() );
-            Core.MinMaxLocResult location = Core.minMaxLoc(result);
-            LOG.debug(String.format("Found template match at max(%f, %f), min(%f, %f)",
-                    location.maxLoc.x, location.maxLoc.y, location.minLoc.x, location.minLoc.y));
-
-            //FIXME Just a pretend value for now until we figure out what location should be
-            bestTag = entry.getValue();
+            if(templateFound(entry.getKey(), targetImage)) tags.add(entry.getValue());
         }
 
-        return bestTag;
+        return tags;
+    }
+
+    private boolean templateFound(Mat template, Mat image) {
+        if(template.width() > image.width() || template.height() > image.height()) {
+            LOG.warn(String.format("Mismatched template size: template is %d x %d but image is %d x %d",
+                    template.width(), template.height(), image.width(), image.height()));
+            return false;
+        }
+
+        Mat result = new Mat();
+        Imgproc.matchTemplate(image, template, result, Imgproc.TM_CCOEFF_NORMED);
+
+        Core.MinMaxLocResult matchResult = Core.minMaxLoc(result);
+        LOG.debug(String.format("Template %d%% match at min(%f, %f), max(%f, %f) for image (%d, %d)",
+                (int) (matchResult.maxVal * 100), matchResult.minLoc.x, matchResult.minLoc.y, matchResult.maxLoc.x, matchResult.maxLoc.y, image.width(), image.height()));
+
+        return matchResult.maxVal > 0.9;
     }
 
     private Mat renderPDF(File file) throws IOException {
@@ -80,9 +92,7 @@ public class TaggingService {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         ImageIO.write(image, "PNG", outputStream);
 
-        Mat rendered = new Mat(image.getWidth(), image.getHeight(), CvType.CV_8UC3);
-        rendered.put(0, 0, outputStream.toByteArray());
-        return rendered;
+        return Imgcodecs.imdecode(new MatOfByte(outputStream.toByteArray()), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
     }
 
     private Mat renderImage(File file) {
