@@ -7,9 +7,6 @@
       "fileName": {
         "type": "keyword"
       },
-      "parentPath": {
-        "type": "keyword"
-      },
       "lastModified": {
         "type": "date"
       },

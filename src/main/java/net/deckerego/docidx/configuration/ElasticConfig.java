@@ -1,5 +1,6 @@
 package net.deckerego.docidx.configuration;
 
+import lombok.Data;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.transport.NoNodeAvailableException;
@@ -21,6 +22,7 @@ import java.net.UnknownHostException;
 @Configuration
 @ConfigurationProperties(prefix = "elasticsearch")
 @EnableElasticsearchRepositories("net.deckerego.docidx.repository")
+@Data
 public class ElasticConfig {
     private static final Logger LOG = LoggerFactory.getLogger(ElasticConfig.class);
 
@@ -30,19 +32,6 @@ public class ElasticConfig {
     private int batchSize = 10;
     private long batchWaitMillis = 10000;
     private int maxResults = 10000;
-
-    public void setHost(String host) { this.host = host; }
-    public String getHost() { return this.host; }
-    public void setPort(int port) { this.port = port; }
-    public int getPort() { return this.port; }
-    public void setCluster(String cluster) { this.cluster = cluster; }
-    public String getCluster() { return this.cluster; }
-    public void setBatchSize(int batchSize) { this.batchSize = batchSize; }
-    public int getBatchSize() { return this.batchSize; }
-    public void setBatchWaitMillis(long batchWaitMillis) { this.batchWaitMillis = batchWaitMillis; }
-    public long getBatchWaitMillis() { return this.batchWaitMillis; }
-    public void setMaxResults(int maxResults) { this.maxResults = maxResults; }
-    public int getMaxResults() { return this.maxResults; }
 
     private void waitForClientConnection(Client client) throws InterruptedException {
         boolean portClosed = true;

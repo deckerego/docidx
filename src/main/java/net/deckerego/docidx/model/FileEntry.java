@@ -10,11 +10,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 @Document(indexName = "docidx", type = "fileentry")
 @Mapping(mappingPath = "fileentry-mapping.json")
@@ -30,6 +26,7 @@ public class FileEntry {
     public Date lastModified;
     public String body;
     public Map<String, String> metadata;
+    public Set<Tag> tags;
     public BufferedImage thumbnail;
 
     public FileEntry() {
@@ -40,6 +37,7 @@ public class FileEntry {
         this.body = "";
         this.metadata = new HashMap<>(0);
         this.thumbnail = blankImage;
+        this.tags = new HashSet<>();
     }
 
     public byte[] getThumbnail() {
@@ -67,5 +65,30 @@ public class FileEntry {
     public String toString() {
         return String.format("FileEntry[ ID: %s, File: %s, Modified %s ]",
                 this.id, this.fileName, this.lastModified);
+    }
+
+    public static class Tag {
+        public String name;
+        public double score;
+
+        public Tag() {
+        }
+
+        public Tag(String name, double score) {
+            this();
+            this.name = name;
+            this.score = score;
+        }
+
+        @Override
+        public boolean equals(Object target) {
+            return (! target.getClass().isInstance(Tag.class))
+                    && this.name.equals(((Tag)target).name);
+        }
+
+        @Override
+        public int hashCode() {
+            return this.name.hashCode();
+        }
     }
 }

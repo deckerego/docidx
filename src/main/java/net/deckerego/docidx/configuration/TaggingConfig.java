@@ -5,10 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ConfigurationProperties(prefix = "parser")
+@ConfigurationProperties(prefix = "tagging")
 @Data
-public class ParserConfig {
-    private int ocrTimeoutSeconds = 300;
-    private String ocrLanguage = "eng";
-    private Boolean enableOcr = Boolean.TRUE;
+public class TaggingConfig {
+    private double threshold = 0.8;
 }
