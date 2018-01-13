@@ -6,6 +6,9 @@
       },
       "template": {
         "type": "binary"
+      },
+      "sourceDocument": {
+        "type": "object"
       }
     }
   }
