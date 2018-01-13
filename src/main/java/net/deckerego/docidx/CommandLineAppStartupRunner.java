@@ -40,8 +40,8 @@ public class CommandLineAppStartupRunner implements CommandLineRunner {
 
                 LOG.info(String.format("Published %d and consumed %d messages in %d seconds",
                         this.workBroker.getPublishCount(), this.workBroker.getConsumedCount(), elapsedTime / 1000));
-                LOG.info(String.format("Added %d, Modified %d, Deleted %d records",
-                        this.crawlerService.getAddCount(), this.crawlerService.getModCount(), this.crawlerService.getDelCount()));
+                LOG.info(String.format("Added %d, Modified %d, Unmodified %d, Deleted %d records",
+                        this.crawlerService.getAddCount(), this.crawlerService.getModCount(), this.crawlerService.getUnmodCount(), this.crawlerService.getDelCount()));
                 LOG.info(String.format("Indexing complete, will resume in %d seconds", this.crawlerConfig.getWaitSeconds()));
 
                 Thread.sleep(this.crawlerConfig.getWaitSeconds() * 1000L);

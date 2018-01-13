@@ -1,9 +1,12 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.TaggingConfig;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.TagTemplate;
+import net.deckerego.docidx.repository.DocumentRepository;
 import net.deckerego.docidx.repository.TagTemplateRepository;
+import net.deckerego.docidx.util.WorkBroker;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -30,6 +33,15 @@ public class TaggingServiceTests {
 
     @MockBean
     private TaggingConfig taggingConfig;
+
+    @MockBean
+    private DocumentRepository documentRepository;
+
+    @MockBean
+    private CrawlerConfig crawlerConfig;
+
+    @MockBean
+    private WorkBroker workBroker;
 
     @Test
     public void positiveMatchPNG() {

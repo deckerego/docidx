@@ -40,6 +40,12 @@ public class CrawlerServiceTests {
     @MockBean
     private WorkBroker workBroker;
 
+    @MockBean
+    private ThumbnailService thumbnailService;
+
+    @MockBean
+    private TaggingService taggingService;
+
     @Autowired
     private CrawlerService crawlerService;
 

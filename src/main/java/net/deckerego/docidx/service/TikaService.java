@@ -3,6 +3,8 @@ package net.deckerego.docidx.service;
 import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.ParserConfig;
 import net.deckerego.docidx.model.FileEntry;
+import net.deckerego.docidx.model.TaggingTask;
+import net.deckerego.docidx.model.ThumbnailTask;
 import net.deckerego.docidx.model.TikaTask;
 import net.deckerego.docidx.util.WorkBroker;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -46,9 +48,6 @@ public class TikaService {
     @Autowired
     public ParserConfig parserConfig;
 
-    @Autowired
-    public ThumbnailService thumbnailService;
-
     private Parser documentParser;
     private ParseContext parserContext;
 
@@ -57,10 +56,12 @@ public class TikaService {
         this.workBroker.handle(TikaTask.class, task -> {
             LOG.info(String.format("Starting Tika parsing %s", task.file));
             long startTime = System.currentTimeMillis();
-            FileEntry entry = this.parse(task.file);
-            LOG.info(String.format("Completed Tika parsing %s in %d seconds", task.file, (System.currentTimeMillis() - startTime) / 1000));
 
-            task.callback.accept(entry);
+            FileEntry entry = this.parse(task.file);
+
+            LOG.info(String.format("Completed Tika parsing %s in %d seconds", task.file, (System.currentTimeMillis() - startTime) / 1000));
+            workBroker.publish(new TaggingTask(entry));
+            workBroker.publish(new ThumbnailTask(entry));
         });
     }
 
@@ -87,15 +88,13 @@ public class TikaService {
         LOG.info("Created Tika OCR Context");
     }
 
-    public void submit(Collection<Path> files, Consumer<FileEntry> callback) {
+    public void submit(Collection<Path> files) {
         LOG.debug(String.format("Submitting parse of %s", files));
-        for (Path file : files) {
-            TikaTask task = new TikaTask(file, callback);
-            this.workBroker.publish(task);
-        }
+        for (Path file : files)
+            this.workBroker.publish(new TikaTask(file));
     }
 
-    private FileEntry parse(Path file) {
+    public FileEntry parse(Path file) {
         Path rootPath = Paths.get(crawlerConfig.getRootPath());
         Path parentPath = rootPath.relativize(file.getParent());
 
@@ -122,9 +121,6 @@ public class TikaService {
             entry.metadata = new HashMap<>();
             for (String prop : metadata.names())
                 entry.metadata.put(prop, metadata.get(prop));
-
-            String contentType = entry.metadata.getOrDefault("Content-Type", "application/octet-stream");
-            entry.thumbnail = thumbnailService.render(file.toFile(), contentType, 0.5f);
         }
 
         return entry;

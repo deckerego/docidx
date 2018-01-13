@@ -40,6 +40,12 @@ public class CrawlerService {
     public TikaService tikaService;
 
     @Autowired
+    public ThumbnailService thumbnailService;
+
+    @Autowired
+    public TaggingService taggingService;
+
+    @Autowired
     public DocumentRepository documentRepository;
 
     @Autowired
@@ -47,6 +53,7 @@ public class CrawlerService {
 
     private AtomicLong addCount = new AtomicLong(0);
     private AtomicLong modCount = new AtomicLong(0);
+    private AtomicLong unmodCount = new AtomicLong(0);
     private AtomicLong delCount = new AtomicLong(0);
 
     @PostConstruct
@@ -59,6 +66,7 @@ public class CrawlerService {
         //Reset our diagnostic counters
         this.addCount.set(0L);
         this.modCount.set(0L);
+        this.unmodCount.set(0L);
         this.delCount.set(0L);
 
         //Walk the given directory and issue ParentEntry messages for later processing
@@ -161,6 +169,12 @@ public class CrawlerService {
         modCount.addAndGet(actions.updates.size());
         LOG.debug(String.format("Found %d updates for %s", actions.updates.size(), parent.getFileName().toString()));
 
+        actions.unmodified = files.keySet().stream()
+                .filter(f -> documents.containsKey(f) && ! isBefore(documents.get(f), files.get(f)))
+                .map(files::get).collect(Collectors.toSet());
+        unmodCount.addAndGet(actions.unmodified.size());
+        LOG.debug(String.format("Found %d unmodified for %s", actions.unmodified.size(), parent.getFileName().toString()));
+
         actions.deletions = documents.keySet().stream()
                 .filter(f -> ! files.containsKey(f))
                 .map(documents::get).collect(Collectors.toSet());
@@ -176,23 +190,15 @@ public class CrawlerService {
         CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p));
 
         try {
-            //Send out FileEntry messages for deletion or Path messages for additions/updates
-            futureEntries
-                    .whenComplete((actions, ex) -> {
-                        if (ex != null)
-                            LOG.error(String.format("Error mapping additions for %s", parent.toString()), ex);
-                        else tikaService.submit(actions.additions, workBroker::publish);
-                    })
-                    .whenComplete((actions, ex) -> {
-                        if (ex != null) LOG.error(String.format("Error mapping updates for %s", parent.toString()), ex);
-                        else tikaService.submit(actions.updates, workBroker::publish);
-                    })
-                    .whenComplete((actions, ex) -> {
-                        if (ex != null)
-                            LOG.error(String.format("Error mapping deletions for %s", parent.toString()), ex);
-                        else documentRepository.deleteAll(actions.deletions);
-                    })
-                    .get(); // I just like the composition.
+            futureEntries //Submit new document
+                    .whenComplete((actions, ex) -> tikaService.submit(actions.additions))
+                    .whenComplete((actions, ex) -> tikaService.submit(actions.updates))
+                    .whenComplete((actions, ex) -> documentRepository.deleteAll(actions.deletions))
+                    .get();
+
+            futureEntries //Submit re-tagging work
+                    .whenComplete((actions, ex) -> { if(actions.matchTagging) taggingService.submit(actions.unmodified); })
+                    .get();
         } catch(InterruptedException e) {
             LOG.error(String.format("Interrupted while routing files for %s", parent.toString()), e);
         } catch(ExecutionException e) {
@@ -202,5 +208,6 @@ public class CrawlerService {
 
     public long getAddCount() { return this.addCount.get(); }
     public long getModCount() { return this.modCount.get(); }
+    public long getUnmodCount() { return this.unmodCount.get(); }
     public long getDelCount() { return this.delCount.get(); }
 }

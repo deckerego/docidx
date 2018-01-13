@@ -1,9 +1,14 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.TaggingConfig;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.TagTemplate;
+import net.deckerego.docidx.model.TaggingTask;
+import net.deckerego.docidx.model.TikaTask;
+import net.deckerego.docidx.repository.DocumentRepository;
 import net.deckerego.docidx.repository.TagTemplateRepository;
+import net.deckerego.docidx.util.WorkBroker;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.opencv.core.Core;
@@ -23,10 +28,12 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,15 +48,48 @@ public class TaggingService {
     public TagTemplateRepository tagTemplateRepository;
 
     @Autowired
+    public CrawlerConfig crawlerConfig;
+
+    @Autowired
+    public DocumentRepository documentRepository;
+
+    @Autowired
     public TaggingConfig taggingConfig;
 
     private Collection<TagTemplate> tagTemplates;
+
+    @Autowired
+    public WorkBroker workBroker;
+
+    @PostConstruct
+    public void initBroker() {
+        this.workBroker.handle(TaggingTask.class, task -> {
+            long startTime = System.currentTimeMillis();
+
+            String contentType = task.document.metadata.getOrDefault("Content-Type", "application/octet-stream");
+            File relativeFile = new File(task.document.parentPath, task.document.fileName);
+            File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
+            LOG.info(String.format("Starting tagging %s", relativeFile.toString()));
+            task.document.tags = this.tag(absoluteFile, contentType);
+
+            LOG.info(String.format("Completed tagging %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
+            workBroker.publish(task.document); //TODO Is Spring Data smart enough to do partial updates?
+        });
+    }
 
     @PostConstruct
     public void initTemplates() {
         this.tagTemplates = new ArrayList<>();
         for(TagTemplate tagTemplate : this.tagTemplateRepository.findAll()) {
             this.tagTemplates.add(tagTemplate);
+        }
+    }
+
+    public void submit(Collection<Path> files) {
+        LOG.debug(String.format("Submitting tagging of %s", files));
+        for (Path file : files) {
+            FileEntry document = this.documentRepository.findByFilename(file.getParent().toString(), file.getFileName().toString());
+            this.workBroker.publish(new TaggingTask(document));
         }
     }
 
