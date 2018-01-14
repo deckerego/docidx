@@ -29,10 +29,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -71,9 +68,10 @@ public class TaggingService {
             File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
             LOG.info(String.format("Starting tagging %s", relativeFile.toString()));
             task.document.tags = this.tag(absoluteFile, contentType);
+            task.document.indexUpdated = Calendar.getInstance().getTime();
 
             LOG.info(String.format("Completed tagging %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
-            workBroker.publish(task.document); //TODO Is Spring Data smart enough to do partial updates?
+            workBroker.publish(task.document);
         });
     }
 

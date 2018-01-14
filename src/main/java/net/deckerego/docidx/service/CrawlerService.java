@@ -62,7 +62,7 @@ public class CrawlerService {
         this.workBroker.handle(ParentEntry.class, this::routeFiles);
     }
 
-    public void crawl() {
+    public void crawl(boolean updateTags) {
         //Reset our diagnostic counters
         this.addCount.set(0L);
         this.modCount.set(0L);
@@ -80,7 +80,7 @@ public class CrawlerService {
                             LOG.debug(String.format("Skipping hidden directory %s", directory));
                         } else if (Files.isReadable(directory)) {
                             LOG.debug(String.format("Submitting parent entry %s", directory.toString()));
-                            workBroker.publish(new ParentEntry(directory));
+                            workBroker.publish(new ParentEntry(directory, updateTags));
                         } else {
                             LOG.warn(String.format("Could not read %s, skipping", directory.toString()));
                         }
@@ -154,8 +154,8 @@ public class CrawlerService {
         return document.lastModified.before(fileLastModified);
     }
 
-    public DocumentActions merge(Path parent, Map<String, FileEntry> documents, Map<String, Path> files) {
-        DocumentActions actions = new DocumentActions(parent);
+    public DocumentActions merge(Path parent, Map<String, FileEntry> documents, Map<String, Path> files, boolean updateTags) {
+        DocumentActions actions = new DocumentActions(parent, updateTags);
 
         actions.additions = files.keySet().stream()
                 .filter(f -> ! documents.containsKey(f))
@@ -187,7 +187,7 @@ public class CrawlerService {
     private void routeFiles(ParentEntry parent) {
         CompletableFuture<Map<String, FileEntry>> futureDocuments = CompletableFuture.supplyAsync(() -> getDocuments(parent.directory));
         CompletableFuture<Map<String, Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(parent.directory));
-        CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p));
+        CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p, parent.updateTags));
 
         try {
             futureEntries //Submit new document

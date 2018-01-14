@@ -30,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
@@ -103,6 +104,7 @@ public class TikaService {
         entry.fileName = file.getFileName().toString();
         entry.lastModified = new Date(file.toFile().lastModified());
         entry.id = DigestUtils.md5Hex(file.toString());
+        entry.indexUpdated = Calendar.getInstance().getTime();
 
         ContentHandler body = new BodyContentHandler();
         Metadata metadata = new Metadata();

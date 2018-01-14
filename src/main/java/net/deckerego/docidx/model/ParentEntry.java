@@ -4,8 +4,10 @@ import java.nio.file.Path;
 
 public class ParentEntry {
     public Path directory;
+    public boolean updateTags = false;
 
-    public ParentEntry(Path directory) {
+    public ParentEntry(Path directory, boolean updateTags) {
+        this.updateTags = updateTags;
         this.directory = directory;
     }
 

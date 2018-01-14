@@ -24,6 +24,7 @@ public class FileEntry {
     public String parentPath;
     public String fileName;
     public Date lastModified;
+    public Date indexUpdated;
     public String body;
     public Map<String, String> metadata;
     public Set<Tag> tags;

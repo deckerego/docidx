@@ -7,7 +7,13 @@
       "fileName": {
         "type": "keyword"
       },
+      "parentPath": {
+        "type": "keyword"
+      },
       "lastModified": {
+        "type": "date"
+      },
+      "indexUpdated": {
         "type": "date"
       },
       "body": {

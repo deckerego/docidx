@@ -9,6 +9,7 @@ import org.springframework.data.elasticsearch.annotations.Mapping;
 import org.springframework.data.elasticsearch.annotations.Setting;
 
 import java.io.Serializable;
+import java.util.Date;
 
 @Document(indexName = "docidx", type = "tagtemplate")
 @Mapping(mappingPath = "tagtemplate-mapping.json")
@@ -20,4 +21,5 @@ public class TagTemplate implements Serializable {
     public String id;
     public Mat template;
     public String name;
+    public Date indexUpdated;
 }

@@ -1,6 +1,10 @@
 package net.deckerego.docidx;
 
 import net.deckerego.docidx.configuration.CrawlerConfig;
+import net.deckerego.docidx.model.FileEntry;
+import net.deckerego.docidx.model.TagTemplate;
+import net.deckerego.docidx.repository.DocumentRepository;
+import net.deckerego.docidx.repository.TagTemplateRepository;
 import net.deckerego.docidx.service.CrawlerService;
 import net.deckerego.docidx.util.WorkBroker;
 import org.slf4j.Logger;
@@ -22,24 +26,34 @@ public class CommandLineAppStartupRunner implements CommandLineRunner {
     private CrawlerService crawlerService;
 
     @Autowired
+    private DocumentRepository documentRepository;
+
+    @Autowired
+    private TagTemplateRepository tagTemplateRepository;
+
+    @Autowired
     private WorkBroker workBroker;
 
     private boolean isRunning = true;
 
     @Override
-    public void run(String... args) throws Exception {
-        long startTime = System.currentTimeMillis();
+    public void run(String... args) {
+        FileEntry latestDoc = documentRepository.findFirstByOrderByIndexUpdatedDesc();
+        long lastIndexUpdate = latestDoc != null ? latestDoc.indexUpdated.getTime() : 0L;
 
         while(this.isRunning) {
-            this.crawlerService.crawl();
+            long startTime = System.currentTimeMillis();
+            TagTemplate latestTemplate = tagTemplateRepository.findFirstByOrderByIndexUpdatedDesc();
+            long lastTagUpdate = latestTemplate != null ? latestTemplate.indexUpdated.getTime() : 0L;
+
+            this.crawlerService.crawl(lastIndexUpdate <= lastTagUpdate);
 
             try {
                 this.workBroker.waitUntilComplete();
-
-                long elapsedTime = System.currentTimeMillis() - startTime;
+                lastIndexUpdate = System.currentTimeMillis();
 
                 LOG.info(String.format("Published %d and consumed %d messages in %d seconds",
-                        this.workBroker.getPublishCount(), this.workBroker.getConsumedCount(), elapsedTime / 1000));
+                        this.workBroker.getPublishCount(), this.workBroker.getConsumedCount(), (lastIndexUpdate - startTime) / 1000));
                 LOG.info(String.format("Added %d, Modified %d, Unmodified %d, Deleted %d records",
                         this.crawlerService.getAddCount(), this.crawlerService.getModCount(), this.crawlerService.getUnmodCount(), this.crawlerService.getDelCount()));
                 LOG.info(String.format("Indexing complete, will resume in %d seconds", this.crawlerConfig.getWaitSeconds()));

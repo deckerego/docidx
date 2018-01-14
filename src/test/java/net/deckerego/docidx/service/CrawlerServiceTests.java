@@ -59,7 +59,7 @@ public class CrawlerServiceTests {
     public void directoryStreamCollector() {
         when(crawlerConfig.getRootPath()).thenReturn("tests");
 
-        this.crawlerService.crawl();
+        this.crawlerService.crawl(false);
 
         then(this.workBroker).should().publish(any(ParentEntry.class));
     }
@@ -104,7 +104,7 @@ public class CrawlerServiceTests {
         files.put(addition01.getFileName().toString(), addition01);
         files.put(existing02.getFileName().toString(), existing02);
 
-        DocumentActions actions = crawlerService.merge(parent, documents, files);
+        DocumentActions actions = crawlerService.merge(parent, documents, files, false);
 
         assertThat(actions).isNotNull();
         assertThat(actions.additions.size()).isEqualTo(1);
@@ -130,7 +130,7 @@ public class CrawlerServiceTests {
 
         Map<String, Path> files = new HashMap<>();
 
-        DocumentActions actions = crawlerService.merge(parent, documents, files);
+        DocumentActions actions = crawlerService.merge(parent, documents, files, false);
 
         assertThat(actions).isNotNull();
         assertThat(actions.additions.size()).isEqualTo(0);
@@ -163,7 +163,7 @@ public class CrawlerServiceTests {
         Map<String, Path> files = new HashMap<>();
         files.put(existing02.getFileName().toString(), existing02);
 
-        DocumentActions actions = crawlerService.merge(parent, documents, files);
+        DocumentActions actions = crawlerService.merge(parent, documents, files, false);
 
         assertThat(actions).isNotNull();
         assertThat(actions.additions.size()).isEqualTo(0);
@@ -185,7 +185,7 @@ public class CrawlerServiceTests {
         Map<String, Path> files = new HashMap<>();
         files.put(addition01.getFileName().toString(), addition01);
 
-        DocumentActions actions = crawlerService.merge(parent, documents, files);
+        DocumentActions actions = crawlerService.merge(parent, documents, files, false);
 
         assertThat(actions).isNotNull();
         assertThat(actions.updates.size()).isEqualTo(0);

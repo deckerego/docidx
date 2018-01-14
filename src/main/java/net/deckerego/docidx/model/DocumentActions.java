@@ -14,7 +14,7 @@ public class DocumentActions {
 
     public Boolean matchTagging;
 
-    public DocumentActions(Path directory) {
+    public DocumentActions(Path directory, boolean matchTagging) {
         this.directory = directory;
 
         this.deletions = new HashSet<>();
@@ -22,7 +22,7 @@ public class DocumentActions {
         this.updates = new HashSet<>();
         this.unmodified = new HashSet<>();
 
-        this.matchTagging = false;
+        this.matchTagging = matchTagging;
     }
 
     @Override

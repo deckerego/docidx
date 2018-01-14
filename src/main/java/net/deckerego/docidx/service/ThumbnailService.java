@@ -22,6 +22,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Calendar;
 import java.util.Collection;
 import java.util.function.Consumer;
 
@@ -46,9 +47,10 @@ public class ThumbnailService {
             File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
             LOG.info(String.format("Starting thumbnail rendering %s", relativeFile.toString()));
             task.document.thumbnail = this.render(absoluteFile, contentType, 0.5F);
+            task.document.indexUpdated = Calendar.getInstance().getTime();
 
             LOG.info(String.format("Completed thumbnail rendering %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
-            workBroker.publish(task.document); //TODO Is Spring Data smart enough to do partial updates?
+            workBroker.publish(task.document);
         });
     }
 
