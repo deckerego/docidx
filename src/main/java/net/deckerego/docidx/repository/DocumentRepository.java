@@ -14,6 +14,4 @@ public interface DocumentRepository extends ElasticsearchRepository<FileEntry, S
 
     @Query("{\"bool\": {\"must\": [{\"match\": {\"parentPath\": \"?0\"}}, {\"match\": {\"fileName\": \"?1\"}}]}}")
     FileEntry findByFilename(String parentPath, String filename);
-
-    FileEntry findFirstByOrderByIndexUpdatedDesc();
 }

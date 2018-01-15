@@ -6,5 +6,4 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface TagTemplateRepository extends ElasticsearchRepository<TagTemplate, String> {
-    TagTemplate findFirstByOrderByIndexUpdatedDesc();
 }
