@@ -67,7 +67,7 @@ public class TaggingService {
             File relativeFile = new File(task.document.parentPath, task.document.fileName);
             File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
             LOG.info(String.format("Starting tagging %s", relativeFile.toString()));
-            task.document.tags = this.tag(absoluteFile, contentType);
+            task.document.tags = this.tag(absoluteFile, contentType); //FIXME Need to merge tags instead
             task.document.indexUpdated = Calendar.getInstance().getTime();
 
             LOG.info(String.format("Completed tagging %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));

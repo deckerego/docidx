@@ -1,6 +1,8 @@
 package net.deckerego.docidx.model;
 
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.annotation.Id;
@@ -22,4 +24,12 @@ public class TagTemplate implements Serializable {
     public Mat template;
     public String name;
     public Date indexUpdated;
+
+    public byte[] getTemplate() {
+        throw new UnsupportedOperationException("Serialization of TagTemplate in docidx is not supported");
+    }
+
+    public void setTemplate(byte[] image) {
+        this.template = Imgcodecs.imdecode(new MatOfByte(image), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
+    }
 }
