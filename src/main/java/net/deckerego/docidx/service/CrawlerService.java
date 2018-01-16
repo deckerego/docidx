@@ -6,6 +6,7 @@ import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
 import net.deckerego.docidx.repository.DocumentRepository;
+import net.deckerego.docidx.repository.IndexStatsRepository;
 import net.deckerego.docidx.util.WorkBroker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,26 +32,27 @@ public class CrawlerService {
     private static final Logger LOG = LoggerFactory.getLogger(CrawlerService.class);
 
     @Autowired
-    public CrawlerConfig crawlerConfig;
+    private CrawlerConfig crawlerConfig;
 
     @Autowired
-    public ElasticConfig elasticConfig;
+    private ElasticConfig elasticConfig;
 
     @Autowired
-    public TikaService tikaService;
+    private TikaService tikaService;
 
     @Autowired
-    public ThumbnailService thumbnailService;
+    private TaggingService taggingService;
 
     @Autowired
-    public TaggingService taggingService;
+    private IndexStatsRepository indexStatsRepository;
 
     @Autowired
-    public DocumentRepository documentRepository;
+    private DocumentRepository documentRepository;
 
     @Autowired
-    public WorkBroker workBroker;
+    private WorkBroker workBroker;
 
+    private long lastIndexUpdate;
     private AtomicLong addCount = new AtomicLong(0);
     private AtomicLong modCount = new AtomicLong(0);
     private AtomicLong unmodCount = new AtomicLong(0);
@@ -62,12 +64,28 @@ public class CrawlerService {
         this.workBroker.handle(ParentEntry.class, this::routeFiles);
     }
 
-    public void crawl(boolean updateTags) {
+    @PostConstruct
+    public void initLastUpdated() {
+        Date latestDoc = indexStatsRepository.documentLastUpdated();
+        this.lastIndexUpdate = latestDoc != null ? latestDoc.getTime() : 0L;
+        LOG.info(String.format("Starting new document run as of %tc", latestDoc));
+    }
+
+    public void crawl() {
         //Reset our diagnostic counters
         this.addCount.set(0L);
         this.modCount.set(0L);
         this.unmodCount.set(0L);
         this.delCount.set(0L);
+
+        //Determine last time the template database was updated
+        Date latestTemplate = indexStatsRepository.tagTemplateLastUpdated();
+        long lastTagUpdate = latestTemplate != null ? latestTemplate.getTime() : 0L;
+        LOG.debug(String.format("Last tag update %tc, last index run %tc", latestTemplate, new Date(this.lastIndexUpdate)));
+
+        //TODO I'm not a big fan of this state being preserved, figure out a better way
+        if(this.lastIndexUpdate <= lastTagUpdate) taggingService.initTemplates();
+        else taggingService.reuseTemplates();
 
         //Walk the given directory and issue ParentEntry messages for later processing
         Path cwd = Paths.get(crawlerConfig.getRootPath());
@@ -80,7 +98,7 @@ public class CrawlerService {
                             LOG.debug(String.format("Skipping hidden directory %s", directory));
                         } else if (Files.isReadable(directory)) {
                             LOG.debug(String.format("Submitting parent entry %s", directory.toString()));
-                            workBroker.publish(new ParentEntry(directory, updateTags));
+                            workBroker.publish(new ParentEntry(directory));
                         } else {
                             LOG.warn(String.format("Could not read %s, skipping", directory.toString()));
                         }
@@ -99,6 +117,8 @@ public class CrawlerService {
             });
         } catch(IOException e) {
             LOG.error(String.format("Fatal exception when finding dirs under %s", cwd), e);
+        } finally {
+            this.lastIndexUpdate = System.currentTimeMillis();
         }
     }
 
@@ -187,7 +207,7 @@ public class CrawlerService {
     private void routeFiles(ParentEntry parent) {
         CompletableFuture<Map<String, FileEntry>> futureDocuments = CompletableFuture.supplyAsync(() -> getDocuments(parent.directory));
         CompletableFuture<Map<String, Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(parent.directory));
-        CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p, parent.updateTags));
+        CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p, taggingService.rebuildTagging()));
 
         try {
             futureEntries //Submit new document

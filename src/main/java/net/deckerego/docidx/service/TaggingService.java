@@ -42,21 +42,23 @@ public class TaggingService {
     }
 
     @Autowired
-    public TagTemplateRepository tagTemplateRepository;
+    private TagTemplateRepository tagTemplateRepository;
 
     @Autowired
-    public CrawlerConfig crawlerConfig;
+    private CrawlerConfig crawlerConfig;
 
     @Autowired
-    public DocumentRepository documentRepository;
+    private DocumentRepository documentRepository;
 
     @Autowired
-    public TaggingConfig taggingConfig;
+    private TaggingConfig taggingConfig;
 
     private Collection<TagTemplate> tagTemplates;
 
+    private Boolean rebuildTagging;
+
     @Autowired
-    public WorkBroker workBroker;
+    private WorkBroker workBroker;
 
     @PostConstruct
     public void initBroker() {
@@ -67,7 +69,9 @@ public class TaggingService {
             File relativeFile = new File(task.document.parentPath, task.document.fileName);
             File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
             LOG.info(String.format("Starting tagging %s", relativeFile.toString()));
-            task.document.tags = this.tag(absoluteFile, contentType); //FIXME Need to merge tags instead
+            Set<FileEntry.Tag> tags = this.tag(absoluteFile, contentType);
+
+            task.document.tags =  merge(task.document.tags, tags);
             task.document.indexUpdated = Calendar.getInstance().getTime();
 
             LOG.info(String.format("Completed tagging %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
@@ -81,6 +85,16 @@ public class TaggingService {
         for(TagTemplate tagTemplate : this.tagTemplateRepository.findAll()) {
             this.tagTemplates.add(tagTemplate);
         }
+        this.rebuildTagging = true;
+    }
+
+    public void reuseTemplates() {
+        this.rebuildTagging = false;
+    }
+
+    //TODO I'm not a big fan of this state being preserved, figure out a better way
+    public boolean rebuildTagging() {
+        return this.rebuildTagging;
     }
 
     public void submit(Collection<Path> files) {
@@ -126,6 +140,29 @@ public class TaggingService {
         return tags;
     }
 
+    public static Set<FileEntry.Tag> merge(Set<FileEntry.Tag> setOne, Set<FileEntry.Tag> setTwo) {
+        Set<FileEntry.Tag> mergedSet = mergeLeft(setOne, setTwo);
+        mergedSet.addAll(mergeLeft(setTwo, setOne));
+        return mergedSet;
+    }
+
+    private static Set<FileEntry.Tag> mergeLeft(Set<FileEntry.Tag> setOne, Set<FileEntry.Tag> setTwo) {
+        Set<FileEntry.Tag> setNew = new HashSet<>();
+
+        Map<String, Double> mapTwo = new HashMap<>();
+        for (FileEntry.Tag tag : setTwo) mapTwo.put(tag.name, tag.score);
+        for(FileEntry.Tag tag : setOne) {
+            if(mapTwo.containsKey(tag.name)) {
+                double highScore = Math.max(tag.score, mapTwo.get(tag.name));
+                setNew.add(new FileEntry.Tag(tag.name, highScore));
+            } else {
+                setNew.add(tag);
+            }
+        }
+
+        return setNew;
+    }
+
     private double templateScore(Mat template, Mat image) {
         if(image == null) {
             LOG.warn("Null image will not be matched against templates");
@@ -138,8 +175,14 @@ public class TaggingService {
             return 0.0;
         }
 
+        //Trying out shift to greyscale for matching...
+        Mat templateGray = new Mat();
+        Imgproc.cvtColor(template, templateGray, Imgproc.COLOR_BGR2GRAY);
+        Mat imageGray = new Mat();
+        Imgproc.cvtColor(image, imageGray, Imgproc.COLOR_BGR2GRAY);
+
         Mat result = new Mat();
-        Imgproc.matchTemplate(image, template, result, Imgproc.TM_CCOEFF_NORMED);
+        Imgproc.matchTemplate(imageGray, templateGray, result, Imgproc.TM_CCOEFF_NORMED);
 
         Core.MinMaxLocResult matchResult = Core.minMaxLoc(result);
         LOG.debug(String.format("Template %d%% match at (%f, %f) for image (%d, %d)",

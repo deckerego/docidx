@@ -3,6 +3,7 @@ package net.deckerego.docidx;
 import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.repository.IndexStatsRepository;
 import net.deckerego.docidx.service.CrawlerService;
+import net.deckerego.docidx.service.TaggingService;
 import net.deckerego.docidx.util.WorkBroker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,29 +24,18 @@ public class CommandLineAppStartupRunner implements CommandLineRunner {
     private CrawlerService crawlerService;
 
     @Autowired
-    private IndexStatsRepository indexStatsRepository;
-
-    @Autowired
     private WorkBroker workBroker;
 
     private boolean isRunning = true;
 
     @Override
     public void run(String... args) {
-        Date latestDoc = indexStatsRepository.documentLastUpdated();
-        long lastIndexUpdate = latestDoc != null ? latestDoc.getTime() : 0L;
-        LOG.info(String.format("Starting new document run as of %tc", latestDoc));
-
         while(this.isRunning) {
             long startTime = System.currentTimeMillis();
-            Date latestTemplate = indexStatsRepository.tagTemplateLastUpdated();
-            long lastTagUpdate = latestTemplate != null ? latestTemplate.getTime() : 0L;
-            LOG.debug(String.format("Last tag update %tc, last index run %tc", latestTemplate, new Date(lastIndexUpdate)));
 
-            this.crawlerService.crawl(lastIndexUpdate <= lastTagUpdate);
+            this.crawlerService.crawl();
 
             try {
-                lastIndexUpdate = System.currentTimeMillis();
                 this.workBroker.waitUntilComplete();
 
                 LOG.info(String.format("Published %d and consumed %d messages in %d seconds",

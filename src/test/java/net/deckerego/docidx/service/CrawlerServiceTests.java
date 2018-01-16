@@ -6,6 +6,7 @@ import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
 import net.deckerego.docidx.repository.DocumentRepository;
+import net.deckerego.docidx.repository.IndexStatsRepository;
 import net.deckerego.docidx.util.WorkBroker;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -41,7 +42,7 @@ public class CrawlerServiceTests {
     private WorkBroker workBroker;
 
     @MockBean
-    private ThumbnailService thumbnailService;
+    private IndexStatsRepository indexStatsRepository;
 
     @MockBean
     private TaggingService taggingService;
@@ -59,7 +60,7 @@ public class CrawlerServiceTests {
     public void directoryStreamCollector() {
         when(crawlerConfig.getRootPath()).thenReturn("tests");
 
-        this.crawlerService.crawl(false);
+        this.crawlerService.crawl();
 
         then(this.workBroker).should().publish(any(ParentEntry.class));
     }

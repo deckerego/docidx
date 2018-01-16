@@ -132,4 +132,31 @@ public class TaggingServiceTests {
 
         Assertions.assertThat(tags).doesNotContain(new FileEntry.Tag("myTag", 0.0));
     }
+
+    @Test
+    public void mergeTags() {
+        FileEntry.Tag tagOne = new FileEntry.Tag("testOne", 0.1);
+        FileEntry.Tag tagTwo = new FileEntry.Tag("testTwo", 0.2);
+        FileEntry.Tag tagThree = new FileEntry.Tag("testOne", 0.3);
+        FileEntry.Tag tagFour = new FileEntry.Tag("testFour", 0.4);
+
+        Set<FileEntry.Tag> setOne = new HashSet<>();
+        setOne.add(tagOne);
+        setOne.add(tagTwo);
+        setOne.add(tagThree);
+
+        Set<FileEntry.Tag> setTwo = new HashSet<>();
+        setTwo.add(tagThree);
+        setTwo.add(tagFour);
+
+        Set<FileEntry.Tag> setThree = TaggingService.merge(setOne, setTwo);
+
+        Assertions.assertThat(setThree.size()).isEqualTo(3);
+
+        Map<String, Double> mapThree = new HashMap<>();
+        for(FileEntry.Tag tag : setThree) mapThree.put(tag.name, tag.score);
+
+        Assertions.assertThat(mapThree).containsOnlyKeys("testOne", "testTwo", "testFour");
+        Assertions.assertThat(mapThree.get("testOne")).isEqualTo(0.3);
+    }
 }
