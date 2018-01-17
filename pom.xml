@@ -93,7 +93,7 @@
 
 	<repositories>
         <repository>
-            <id>local</id>
+            <id>project-local</id>
             <name>Local Project Libraries</name>
             <url>file://${project.basedir}/lib</url>
         </repository>
