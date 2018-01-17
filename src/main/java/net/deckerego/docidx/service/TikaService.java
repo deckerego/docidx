@@ -61,7 +61,6 @@ public class TikaService {
             FileEntry entry = this.parse(task.file);
 
             LOG.info(String.format("Completed Tika parsing %s in %d seconds", task.file, (System.currentTimeMillis() - startTime) / 1000));
-            workBroker.publish(new TaggingTask(entry));
             workBroker.publish(new ThumbnailTask(entry));
         });
     }

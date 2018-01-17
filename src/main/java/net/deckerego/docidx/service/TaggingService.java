@@ -83,6 +83,10 @@ public class TaggingService {
     public void initTemplates() {
         this.tagTemplates = new ArrayList<>();
         for(TagTemplate tagTemplate : this.tagTemplateRepository.findAll()) {
+            Mat templateGray = new Mat(); //Shift template to grayscale
+            Imgproc.cvtColor(tagTemplate.template, templateGray, Imgproc.COLOR_BGR2GRAY);
+            tagTemplate.template = templateGray;
+
             this.tagTemplates.add(tagTemplate);
         }
         this.rebuildTagging = true;
@@ -124,8 +128,11 @@ public class TaggingService {
                 targetImage = null;
             }
 
+            Mat imageGray = new Mat(); //Move to grayscale for better matching
+            Imgproc.cvtColor(targetImage, imageGray, Imgproc.COLOR_BGR2GRAY);
+
             tags = this.tagTemplates.stream()
-                    .map(tt -> new FileEntry.Tag(tt.name, templateScore(tt.template, targetImage)))
+                    .map(tt -> new FileEntry.Tag(tt.name, templateScore(tt.template, imageGray)))
                     .filter(ft -> ft.score >= taggingConfig.getThreshold())
                     .collect(Collectors.toSet());
 
@@ -175,14 +182,8 @@ public class TaggingService {
             return 0.0;
         }
 
-        //Trying out shift to greyscale for matching...
-        Mat templateGray = new Mat();
-        Imgproc.cvtColor(template, templateGray, Imgproc.COLOR_BGR2GRAY);
-        Mat imageGray = new Mat();
-        Imgproc.cvtColor(image, imageGray, Imgproc.COLOR_BGR2GRAY);
-
         Mat result = new Mat();
-        Imgproc.matchTemplate(imageGray, templateGray, result, Imgproc.TM_CCOEFF_NORMED);
+        Imgproc.matchTemplate(image, template, result, Imgproc.TM_CCOEFF_NORMED);
 
         Core.MinMaxLocResult matchResult = Core.minMaxLoc(result);
         LOG.debug(String.format("Template %d%% match at (%f, %f) for image (%d, %d)",

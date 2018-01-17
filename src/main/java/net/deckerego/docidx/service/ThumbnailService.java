@@ -2,6 +2,7 @@ package net.deckerego.docidx.service;
 
 import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.model.FileEntry;
+import net.deckerego.docidx.model.TaggingTask;
 import net.deckerego.docidx.model.ThumbnailTask;
 import net.deckerego.docidx.model.TikaTask;
 import net.deckerego.docidx.repository.DocumentRepository;
@@ -50,7 +51,7 @@ public class ThumbnailService {
             task.document.indexUpdated = Calendar.getInstance().getTime();
 
             LOG.info(String.format("Completed thumbnail rendering %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
-            workBroker.publish(task.document);
+            workBroker.publish(new TaggingTask(task.document));
         });
     }
 
