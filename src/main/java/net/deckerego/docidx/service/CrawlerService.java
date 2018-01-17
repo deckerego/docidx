@@ -88,6 +88,7 @@ public class CrawlerService {
         else taggingService.reuseTemplates();
 
         //Walk the given directory and issue ParentEntry messages for later processing
+        this.lastIndexUpdate = System.currentTimeMillis();
         Path cwd = Paths.get(crawlerConfig.getRootPath());
         try {
             Files.walkFileTree(cwd, new SimpleFileVisitor<Path>() {
@@ -117,8 +118,6 @@ public class CrawlerService {
             });
         } catch(IOException e) {
             LOG.error(String.format("Fatal exception when finding dirs under %s", cwd), e);
-        } finally {
-            this.lastIndexUpdate = System.currentTimeMillis();
         }
     }
 
