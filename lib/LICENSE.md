@@ -2,7 +2,7 @@ License Agreement
 For Open Source Computer Vision Library
 (3-clause BSD License)
 
-The OpenCV Java bindings are built and distributed within this repository as opencv-340.jar. This is governed by licensing independent of docidx project itself.
+The OpenCV Java bindings are built and distributed within this directory. This is governed by licensing independent of docidx project itself.
 
 By downloading, copying, installing or using the software you agree to this license. If you do not agree to this license, do not download, install, copy or use the software.
 

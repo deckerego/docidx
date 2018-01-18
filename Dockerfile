@@ -1,9 +1,9 @@
-FROM ubuntu:latest
+FROM ubuntu:bionic
 
 MAINTAINER john@deckerego.net
 
 RUN apt-get --assume-yes update
-RUN apt-get --assume-yes install openjdk-8-jre tesseract-ocr libopencv2.4-java
+RUN apt-get --assume-yes install openjdk-8-jre tesseract-ocr libopencv3.2-jni
 
 ARG DOCIDX_VERSION=0.2.0-SNAPSHOT
 ADD target/docidx-${DOCIDX_VERSION}.jar /opt/docidx/docidx.jar
