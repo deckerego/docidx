@@ -1,8 +1,7 @@
 package net.deckerego.docidx.model;
 
-import org.opencv.core.Mat;
-import org.opencv.core.MatOfByte;
-import org.opencv.imgcodecs.Imgcodecs;
+import boofcv.io.image.ConvertRaster;
+import boofcv.struct.image.GrayF32;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.annotation.Id;
@@ -10,6 +9,10 @@ import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Mapping;
 import org.springframework.data.elasticsearch.annotations.Setting;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Date;
 
@@ -21,7 +24,7 @@ public class TagTemplate implements Serializable {
 
     @Id
     public String id;
-    public Mat template;
+    public GrayF32 template;
     public String name;
     public Date indexUpdated;
 
@@ -30,6 +33,17 @@ public class TagTemplate implements Serializable {
     }
 
     public void setTemplate(byte[] image) {
-        this.template = Imgcodecs.imdecode(new MatOfByte(image), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
+        BufferedImage templateImage;
+
+        try {
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(image);
+            templateImage = ImageIO.read(inputStream);
+        } catch(IOException e) {
+            LOG.error(String.format("Could not deserialize thumbnail of %s", this.id), e);
+            templateImage = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+        }
+
+        this.template = new GrayF32(templateImage.getWidth(), templateImage.getHeight());
+        ConvertRaster.bufferedToGray(templateImage, this.template);
     }
 }

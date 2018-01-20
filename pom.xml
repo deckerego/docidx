@@ -70,10 +70,16 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.opencv</groupId>
-			<artifactId>opencv</artifactId>
-			<version>3.2.0</version>
+			<groupId>org.boofcv</groupId>
+			<artifactId>feature</artifactId>
+			<version>0.26</version>
 		</dependency>
+
+        <dependency>
+            <groupId>org.boofcv</groupId>
+            <artifactId>io</artifactId>
+            <version>0.26</version>
+        </dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -92,11 +98,6 @@
 	</build>
 
 	<repositories>
-        <repository>
-            <id>project-local</id>
-            <name>Local Project Libraries</name>
-            <url>file://${project.basedir}/lib</url>
-        </repository>
 		<repository>
 			<id>spring-snapshots</id>
 			<name>Spring Snapshots</name>

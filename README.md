@@ -15,27 +15,7 @@ run the docker container published at: https://hub.docker.com/r/deckerego/docidx
 
 ## Building and Testing Locally
 
-Since docidx relies heavily on computer vision and image processing, bindings to
-native libraries are heavily used. Packaged Java distributions with native libraries
-are a giant pain in the butt - hence leveraging Docker containers to ship things
-by default. If you just want to get docidx up and running Docker will be the easiest
-way to go, but if you would like to tweak the code and run it locally you will
-need to jump through some hoops to install the native libs.
-
-docidx uses bindings for OpenCV and Tesseract native libraries. The OpenCV
-libraries are especially version-sensitive. To install these native binaries in
-MacOS you can use Homebrew, as in:
-
-    brew install tesseract
-    brew install --build-from-source ./lib/opencv.rb
-
-Linux distributions often ship with Tesseract and OpenCV 3.2, such as with
-Ubuntu (Bionic):
-
-    apt-get install tesseract-ocr libopencv3.2-jni
-
-After the native libraries are installed, building and testing can be performed
-locally with Maven and Spring Boot:
+Building and testing can be performed locally with Maven and Spring Boot:
 
     mvn spring-boot:run
 

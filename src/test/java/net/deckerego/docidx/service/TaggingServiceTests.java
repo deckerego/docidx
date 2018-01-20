@@ -1,5 +1,7 @@
 package net.deckerego.docidx.service;
 
+import boofcv.io.image.UtilImageIO;
+import boofcv.struct.image.GrayF32;
 import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.TaggingConfig;
 import net.deckerego.docidx.model.FileEntry;
@@ -10,7 +12,6 @@ import net.deckerego.docidx.util.WorkBroker;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.opencv.imgcodecs.Imgcodecs;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -46,12 +47,11 @@ public class TaggingServiceTests {
     @Test
     public void positiveMatchPNG() {
         TagTemplate tagTemplate = new TagTemplate();
-        File template = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
-        tagTemplate.template = Imgcodecs.imread(template.getAbsolutePath());
+        tagTemplate.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template.png", GrayF32.class);
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
-        when(taggingConfig.getThreshold()).thenReturn(0.99);
+        when(taggingConfig.getThreshold()).thenReturn(0.9);
 
         taggingService.initTemplates();
         File file = new File(System.getProperty("user.dir"), "src/test/docs/test.png");
@@ -63,12 +63,11 @@ public class TaggingServiceTests {
     @Test
     public void positiveMatchPDF() {
         TagTemplate tagTemplate = new TagTemplate();
-        File template = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
-        tagTemplate.template = Imgcodecs.imread(template.getAbsolutePath());
+        tagTemplate.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template.png", GrayF32.class);
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
-        when(taggingConfig.getThreshold()).thenReturn(0.91);
+        when(taggingConfig.getThreshold()).thenReturn(0.9);
 
         taggingService.initTemplates();
         File file = new File(System.getProperty("user.dir"), "src/test/docs/test.pdf");
@@ -80,13 +79,11 @@ public class TaggingServiceTests {
     @Test
     public void pickTheBest() {
         TagTemplate tagTemplateOne = new TagTemplate();
-        File templateGood = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
-        tagTemplateOne.template = Imgcodecs.imread(templateGood.getAbsolutePath());
+        tagTemplateOne.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template.png", GrayF32.class);
         tagTemplateOne.name = "goodTag";
 
         TagTemplate tagTemplateTwo = new TagTemplate();
-        File templateBad = new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png");
-        tagTemplateTwo.template = Imgcodecs.imread(templateBad.getAbsolutePath());
+        tagTemplateTwo.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template_bad.png", GrayF32.class);
         tagTemplateTwo.name = "badTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplateOne, tagTemplateTwo));
@@ -102,12 +99,11 @@ public class TaggingServiceTests {
     @Test
     public void negativeMatchExpectedDimensions() {
         TagTemplate tagTemplate = new TagTemplate();
-        File template = new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png");
-        tagTemplate.template = Imgcodecs.imread(template.getAbsolutePath());
+        tagTemplate.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template_bad.png", GrayF32.class);
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
-        when(taggingConfig.getThreshold()).thenReturn(0.32);
+        when(taggingConfig.getThreshold()).thenReturn(0.3);
 
         taggingService.initTemplates();
         File file = new File(System.getProperty("user.dir"), "src/test/docs/test.pdf");
@@ -119,8 +115,7 @@ public class TaggingServiceTests {
     @Test
     public void negativeMatchMismatchedDimensions() {
         TagTemplate tagTemplate = new TagTemplate();
-        File template = new File(System.getProperty("user.dir"), "src/test/docs/template_bad_big.png");
-        tagTemplate.template = Imgcodecs.imread(template.getAbsolutePath());
+        tagTemplate.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template_bad_big.png", GrayF32.class);
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
