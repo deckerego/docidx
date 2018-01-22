@@ -1,7 +1,5 @@
 package net.deckerego.docidx.service;
 
-import boofcv.io.image.UtilImageIO;
-import boofcv.struct.image.GrayF32;
 import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.TaggingConfig;
 import net.deckerego.docidx.model.FileEntry;
@@ -12,12 +10,14 @@ import net.deckerego.docidx.util.WorkBroker;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.openimaj.image.ImageUtilities;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 
 import static org.mockito.BDDMockito.*;
@@ -45,9 +45,9 @@ public class TaggingServiceTests {
     private WorkBroker workBroker;
 
     @Test
-    public void positiveMatchPNG() {
+    public void positiveMatchPNG() throws IOException {
         TagTemplate tagTemplate = new TagTemplate();
-        tagTemplate.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template.png", GrayF32.class);
+        tagTemplate.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template.png"));
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
@@ -61,9 +61,9 @@ public class TaggingServiceTests {
     }
 
     @Test
-    public void positiveMatchPDF() {
+    public void positiveMatchPDF() throws IOException {
         TagTemplate tagTemplate = new TagTemplate();
-        tagTemplate.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template.png", GrayF32.class);
+        tagTemplate.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template.png"));
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
@@ -77,13 +77,13 @@ public class TaggingServiceTests {
     }
 
     @Test
-    public void pickTheBest() {
+    public void pickTheBest() throws IOException {
         TagTemplate tagTemplateOne = new TagTemplate();
-        tagTemplateOne.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template.png", GrayF32.class);
+        tagTemplateOne.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template.png"));
         tagTemplateOne.name = "goodTag";
 
         TagTemplate tagTemplateTwo = new TagTemplate();
-        tagTemplateTwo.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template_bad.png", GrayF32.class);
+        tagTemplateTwo.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png"));
         tagTemplateTwo.name = "badTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplateOne, tagTemplateTwo));
@@ -97,13 +97,13 @@ public class TaggingServiceTests {
     }
 
     @Test
-    public void negativeMatchExpectedDimensions() {
+    public void negativeMatchExpectedDimensions() throws IOException {
         TagTemplate tagTemplate = new TagTemplate();
-        tagTemplate.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template_bad.png", GrayF32.class);
+        tagTemplate.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png"));
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
-        when(taggingConfig.getThreshold()).thenReturn(0.3);
+        when(taggingConfig.getThreshold()).thenReturn(0.35);
 
         taggingService.initTemplates();
         File file = new File(System.getProperty("user.dir"), "src/test/docs/test.pdf");
@@ -113,9 +113,9 @@ public class TaggingServiceTests {
     }
 
     @Test
-    public void negativeMatchMismatchedDimensions() {
+    public void negativeMatchMismatchedDimensions() throws IOException {
         TagTemplate tagTemplate = new TagTemplate();
-        tagTemplate.template = UtilImageIO.loadImage(System.getProperty("user.dir"), "src/test/docs/template_bad_big.png", GrayF32.class);
+        tagTemplate.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template_bad_big.png"));
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
@@ -126,32 +126,5 @@ public class TaggingServiceTests {
         Set<FileEntry.Tag> tags = taggingService.tag(file, "application/pdf");
 
         Assertions.assertThat(tags).doesNotContain(new FileEntry.Tag("myTag", 0.0));
-    }
-
-    @Test
-    public void mergeTags() {
-        FileEntry.Tag tagOne = new FileEntry.Tag("testOne", 0.1);
-        FileEntry.Tag tagTwo = new FileEntry.Tag("testTwo", 0.2);
-        FileEntry.Tag tagThree = new FileEntry.Tag("testOne", 0.3);
-        FileEntry.Tag tagFour = new FileEntry.Tag("testFour", 0.4);
-
-        Set<FileEntry.Tag> setOne = new HashSet<>();
-        setOne.add(tagOne);
-        setOne.add(tagTwo);
-        setOne.add(tagThree);
-
-        Set<FileEntry.Tag> setTwo = new HashSet<>();
-        setTwo.add(tagThree);
-        setTwo.add(tagFour);
-
-        Set<FileEntry.Tag> setThree = TaggingService.merge(setOne, setTwo);
-
-        Assertions.assertThat(setThree.size()).isEqualTo(3);
-
-        Map<String, Double> mapThree = new HashMap<>();
-        for(FileEntry.Tag tag : setThree) mapThree.put(tag.name, tag.score);
-
-        Assertions.assertThat(mapThree).containsOnlyKeys("testOne", "testTwo", "testFour");
-        Assertions.assertThat(mapThree.get("testOne")).isEqualTo(0.3);
     }
 }

@@ -1,12 +1,5 @@
 package net.deckerego.docidx.service;
 
-import boofcv.alg.feature.detect.template.TemplateMatching;
-import boofcv.factory.feature.detect.template.FactoryTemplateMatching;
-import boofcv.factory.feature.detect.template.TemplateScoreType;
-import boofcv.io.image.ConvertRaster;
-import boofcv.io.image.UtilImageIO;
-import boofcv.struct.feature.Match;
-import boofcv.struct.image.GrayF32;
 import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.configuration.TaggingConfig;
 import net.deckerego.docidx.model.FileEntry;
@@ -17,6 +10,10 @@ import net.deckerego.docidx.repository.TagTemplateRepository;
 import net.deckerego.docidx.util.WorkBroker;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
+import org.openimaj.image.FImage;
+import org.openimaj.image.ImageUtilities;
+import org.openimaj.image.analysis.algorithm.TemplateMatcher;
+import org.openimaj.image.pixel.FValuePixel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,9 +61,8 @@ public class TaggingService {
             File relativeFile = new File(task.document.parentPath, task.document.fileName);
             File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
             LOG.info(String.format("Starting tagging %s", relativeFile.toString()));
-            Set<FileEntry.Tag> tags = this.tag(absoluteFile, contentType);
 
-            task.document.tags =  merge(task.document.tags, tags);
+            task.document.tags = this.tag(absoluteFile, contentType);
             task.document.indexUpdated = Calendar.getInstance().getTime();
 
             LOG.info(String.format("Completed tagging %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
@@ -110,7 +106,7 @@ public class TaggingService {
         Set<FileEntry.Tag> tags = new HashSet<>();
 
         try {
-            final GrayF32 targetImage;
+            final FImage targetImage;
 
             if (type.contains(MediaType.APPLICATION_PDF_VALUE)) {
                 targetImage = renderPDF(file);
@@ -139,30 +135,7 @@ public class TaggingService {
         return tags;
     }
 
-    public static Set<FileEntry.Tag> merge(Set<FileEntry.Tag> setOne, Set<FileEntry.Tag> setTwo) {
-        Set<FileEntry.Tag> mergedSet = mergeLeft(setOne, setTwo);
-        mergedSet.addAll(mergeLeft(setTwo, setOne));
-        return mergedSet;
-    }
-
-    private static Set<FileEntry.Tag> mergeLeft(Set<FileEntry.Tag> setOne, Set<FileEntry.Tag> setTwo) {
-        Set<FileEntry.Tag> setNew = new HashSet<>();
-
-        Map<String, Double> mapTwo = new HashMap<>();
-        for (FileEntry.Tag tag : setTwo) mapTwo.put(tag.name, tag.score);
-        for(FileEntry.Tag tag : setOne) {
-            if(mapTwo.containsKey(tag.name)) {
-                double highScore = Math.max(tag.score, mapTwo.get(tag.name));
-                setNew.add(new FileEntry.Tag(tag.name, highScore));
-            } else {
-                setNew.add(tag);
-            }
-        }
-
-        return setNew;
-    }
-
-    private double templateScore(GrayF32 template, GrayF32 image) {
+    private double templateScore(FImage template, FImage image) {
         if(image == null) {
             LOG.warn("Null image will not be matched against templates");
             return 0.0;
@@ -174,36 +147,25 @@ public class TaggingService {
             return 0.0;
         }
 
-        TemplateMatching<GrayF32> matcher = FactoryTemplateMatching.createMatcher(TemplateScoreType.CORRELATION, GrayF32.class);
-        matcher.setImage(image);
-        matcher.setTemplate(template, null, 3);
-        matcher.process();
+        TemplateMatcher matcher = new TemplateMatcher(template, TemplateMatcher.Mode.NORM_CORRELATION_COEFFICIENT);
+        matcher.analyseImage(image);
+        FValuePixel matchResult = matcher.getBestResponses(1)[0];
 
-        Optional<Match> bestMatch = matcher.getResults().toList().stream().min(Comparator.comparing((Match m) -> m.score));
-
-        if(bestMatch.isPresent()) {
-            Match matchResult = bestMatch.get();
-            LOG.debug(String.format("Template match score %f at (%d, %d) for image (%d, %d)",
-                    matchResult.score, matchResult.x, matchResult.y, image.getWidth(), image.getHeight()));
-            return (1809 - matchResult.score) / 1083;
-        } else {
-            return 0.0;
-        }
+        LOG.debug(String.format("Template match score %f at (%f, %f) for image (%d, %d)",
+                matchResult.getValue(), matchResult.getX(), matchResult.getY(), image.getWidth(), image.getHeight()));
+        return matchResult.getValue();
     }
 
-    private GrayF32 renderPDF(File file) throws IOException {
+    private FImage renderPDF(File file) throws IOException {
         PDDocument doc = PDDocument.load(file);
         PDFRenderer renderer = new PDFRenderer(doc);
         BufferedImage image = renderer.renderImage(0, 1.0F);
         doc.close();
 
-        GrayF32 cvImage = new GrayF32(image.getWidth(), image.getHeight());
-        ConvertRaster.bufferedToGray(image, cvImage);
-
-        return cvImage;
+        return ImageUtilities.createFImage(image);
     }
 
-    private GrayF32 renderImage(File file) {
-        return UtilImageIO.loadImage(file.getParentFile().getPath(), file.getName(), GrayF32.class);
+    private FImage renderImage(File file) throws IOException {
+        return ImageUtilities.readF(file);
     }
 }
