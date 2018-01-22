@@ -74,6 +74,7 @@ public class TaggingService {
     public void initTemplates() {
         this.tagTemplates = new ArrayList<>();
         for(TagTemplate tagTemplate : this.tagTemplateRepository.findAll()) {
+            tagTemplate.templateMatcher = new TemplateMatcher(tagTemplate.template, TemplateMatcher.Mode.NORM_CORRELATION_COEFFICIENT);
             this.tagTemplates.add(tagTemplate);
         }
         this.rebuildTagging = true;
@@ -120,7 +121,7 @@ public class TaggingService {
             }
 
             tags = this.tagTemplates.stream()
-                    .map(tt -> new FileEntry.Tag(tt.name, templateScore(tt.template, targetImage)))
+                    .map(tt -> new FileEntry.Tag(tt.name, templateScore(tt.templateMatcher, targetImage)))
                     .filter(ft -> ft.score >= taggingConfig.getThreshold())
                     .collect(Collectors.toSet());
 
@@ -135,19 +136,18 @@ public class TaggingService {
         return tags;
     }
 
-    private double templateScore(FImage template, FImage image) {
+    private double templateScore(TemplateMatcher matcher, FImage image) {
         if(image == null) {
             LOG.warn("Null image will not be matched against templates");
             return 0.0;
         }
 
-        if(template.getWidth() > image.getWidth() || template.getHeight() > image.getHeight()) {
+        if(matcher.getTemplate().getWidth() > image.getWidth() || matcher.getTemplate().getHeight() > image.getHeight()) {
             LOG.warn(String.format("Mismatched template size: template is %d x %d but image is %d x %d",
-                    template.getWidth(), template.getHeight(), image.getWidth(), image.getHeight()));
+                    matcher.getTemplate().getWidth(), matcher.getTemplate().getHeight(), image.getWidth(), image.getHeight()));
             return 0.0;
         }
 
-        TemplateMatcher matcher = new TemplateMatcher(template, TemplateMatcher.Mode.NORM_CORRELATION_COEFFICIENT);
         matcher.analyseImage(image);
         FValuePixel matchResult = matcher.getBestResponses(1)[0];
 

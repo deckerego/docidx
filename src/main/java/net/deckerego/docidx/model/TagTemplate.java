@@ -2,6 +2,7 @@ package net.deckerego.docidx.model;
 
 import org.openimaj.image.FImage;
 import org.openimaj.image.ImageUtilities;
+import org.openimaj.image.analysis.algorithm.TemplateMatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.annotation.Id;
@@ -26,6 +27,7 @@ public class TagTemplate implements Serializable {
     public FImage template;
     public String name;
     public Date indexUpdated;
+    public transient TemplateMatcher templateMatcher;
 
     public byte[] getTemplate() {
         throw new UnsupportedOperationException("Serialization of TagTemplate in docidx is not supported");
