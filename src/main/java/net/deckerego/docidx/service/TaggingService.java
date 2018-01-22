@@ -5,15 +5,17 @@ import net.deckerego.docidx.configuration.TaggingConfig;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.TagTemplate;
 import net.deckerego.docidx.model.TaggingTask;
+import net.deckerego.docidx.model.TikaTask;
 import net.deckerego.docidx.repository.DocumentRepository;
 import net.deckerego.docidx.repository.TagTemplateRepository;
 import net.deckerego.docidx.util.WorkBroker;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
-import org.openimaj.image.FImage;
-import org.openimaj.image.ImageUtilities;
-import org.openimaj.image.analysis.algorithm.TemplateMatcher;
-import org.openimaj.image.pixel.FValuePixel;
+import org.opencv.core.Core;
+import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,17 +23,23 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Service
 public class TaggingService {
     private static final Logger LOG = LoggerFactory.getLogger(TaggingService.class);
+
+    static {
+        System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+    }
 
     @Autowired
     private TagTemplateRepository tagTemplateRepository;
@@ -61,8 +69,9 @@ public class TaggingService {
             File relativeFile = new File(task.document.parentPath, task.document.fileName);
             File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
             LOG.info(String.format("Starting tagging %s", relativeFile.toString()));
+            Set<FileEntry.Tag> tags = this.tag(absoluteFile, contentType);
 
-            task.document.tags = this.tag(absoluteFile, contentType);
+            task.document.tags =  merge(task.document.tags, tags);
             task.document.indexUpdated = Calendar.getInstance().getTime();
 
             LOG.info(String.format("Completed tagging %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
@@ -74,7 +83,10 @@ public class TaggingService {
     public void initTemplates() {
         this.tagTemplates = new ArrayList<>();
         for(TagTemplate tagTemplate : this.tagTemplateRepository.findAll()) {
-            tagTemplate.templateMatcher = new TemplateMatcher(tagTemplate.template, TemplateMatcher.Mode.NORM_CORRELATION_COEFFICIENT);
+            Mat templateGray = new Mat(); //Shift template to grayscale
+            Imgproc.cvtColor(tagTemplate.template, templateGray, Imgproc.COLOR_BGR2GRAY);
+            tagTemplate.template = templateGray;
+
             this.tagTemplates.add(tagTemplate);
         }
         this.rebuildTagging = true;
@@ -92,11 +104,7 @@ public class TaggingService {
     public void submit(Collection<Path> files) {
         LOG.debug(String.format("Submitting tagging of %s", files));
         for (Path file : files) {
-            Path rootPath = Paths.get(crawlerConfig.getRootPath());
-            Path parentPath = rootPath.relativize(file.getParent());
-
-            FileEntry document = this.documentRepository.findByFilename(parentPath.toString(), file.getFileName().toString());
-
+            FileEntry document = this.documentRepository.findByFilename(file.getParent().toString(), file.getFileName().toString());
             this.workBroker.publish(new TaggingTask(document));
         }
     }
@@ -107,7 +115,7 @@ public class TaggingService {
         Set<FileEntry.Tag> tags = new HashSet<>();
 
         try {
-            final FImage targetImage;
+            final Mat targetImage;
 
             if (type.contains(MediaType.APPLICATION_PDF_VALUE)) {
                 targetImage = renderPDF(file);
@@ -120,8 +128,11 @@ public class TaggingService {
                 targetImage = null;
             }
 
+            Mat imageGray = new Mat(); //Move to grayscale for better matching
+            Imgproc.cvtColor(targetImage, imageGray, Imgproc.COLOR_BGR2GRAY);
+
             tags = this.tagTemplates.stream()
-                    .map(tt -> new FileEntry.Tag(tt.name, templateScore(tt.templateMatcher, targetImage)))
+                    .map(tt -> new FileEntry.Tag(tt.name, templateScore(tt.template, imageGray)))
                     .filter(ft -> ft.score >= taggingConfig.getThreshold())
                     .collect(Collectors.toSet());
 
@@ -136,36 +147,64 @@ public class TaggingService {
         return tags;
     }
 
-    private double templateScore(TemplateMatcher matcher, FImage image) {
+    public static Set<FileEntry.Tag> merge(Set<FileEntry.Tag> setOne, Set<FileEntry.Tag> setTwo) {
+        Set<FileEntry.Tag> mergedSet = mergeLeft(setOne, setTwo);
+        mergedSet.addAll(mergeLeft(setTwo, setOne));
+        return mergedSet;
+    }
+
+    private static Set<FileEntry.Tag> mergeLeft(Set<FileEntry.Tag> setOne, Set<FileEntry.Tag> setTwo) {
+        Set<FileEntry.Tag> setNew = new HashSet<>();
+
+        Map<String, Double> mapTwo = new HashMap<>();
+        for (FileEntry.Tag tag : setTwo) mapTwo.put(tag.name, tag.score);
+        for(FileEntry.Tag tag : setOne) {
+            if(mapTwo.containsKey(tag.name)) {
+                double highScore = Math.max(tag.score, mapTwo.get(tag.name));
+                setNew.add(new FileEntry.Tag(tag.name, highScore));
+            } else {
+                setNew.add(tag);
+            }
+        }
+
+        return setNew;
+    }
+
+    private double templateScore(Mat template, Mat image) {
         if(image == null) {
             LOG.warn("Null image will not be matched against templates");
             return 0.0;
         }
 
-        if(matcher.getTemplate().getWidth() > image.getWidth() || matcher.getTemplate().getHeight() > image.getHeight()) {
+        if(template.width() > image.width() || template.height() > image.height()) {
             LOG.warn(String.format("Mismatched template size: template is %d x %d but image is %d x %d",
-                    matcher.getTemplate().getWidth(), matcher.getTemplate().getHeight(), image.getWidth(), image.getHeight()));
+                    template.width(), template.height(), image.width(), image.height()));
             return 0.0;
         }
 
-        matcher.analyseImage(image);
-        FValuePixel matchResult = matcher.getBestResponses(1)[0];
+        Mat result = new Mat();
+        Imgproc.matchTemplate(image, template, result, Imgproc.TM_CCOEFF_NORMED);
 
-        LOG.debug(String.format("Template match score %f at (%f, %f) for image (%d, %d)",
-                matchResult.getValue(), matchResult.getX(), matchResult.getY(), image.getWidth(), image.getHeight()));
-        return matchResult.getValue();
+        Core.MinMaxLocResult matchResult = Core.minMaxLoc(result);
+        LOG.debug(String.format("Template %d%% match at (%f, %f) for image (%d, %d)",
+                (int) (matchResult.maxVal * 100), matchResult.maxLoc.x, matchResult.maxLoc.y, image.width(), image.height()));
+
+        return matchResult.maxVal;
     }
 
-    private FImage renderPDF(File file) throws IOException {
+    private Mat renderPDF(File file) throws IOException {
         PDDocument doc = PDDocument.load(file);
         PDFRenderer renderer = new PDFRenderer(doc);
         BufferedImage image = renderer.renderImage(0, 1.0F);
         doc.close();
 
-        return ImageUtilities.createFImage(image);
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        ImageIO.write(image, "BMP", outputStream);
+
+        return Imgcodecs.imdecode(new MatOfByte(outputStream.toByteArray()), Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
     }
 
-    private FImage renderImage(File file) throws IOException {
-        return ImageUtilities.readF(file);
+    private Mat renderImage(File file) {
+        return Imgcodecs.imread(file.getAbsolutePath());
     }
 }

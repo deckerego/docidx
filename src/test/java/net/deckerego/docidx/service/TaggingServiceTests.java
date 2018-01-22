@@ -10,14 +10,13 @@ import net.deckerego.docidx.util.WorkBroker;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.openimaj.image.ImageUtilities;
+import org.opencv.imgcodecs.Imgcodecs;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
 
 import static org.mockito.BDDMockito.*;
@@ -45,13 +44,14 @@ public class TaggingServiceTests {
     private WorkBroker workBroker;
 
     @Test
-    public void positiveMatchPNG() throws IOException {
+    public void positiveMatchPNG() {
         TagTemplate tagTemplate = new TagTemplate();
-        tagTemplate.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template.png"));
+        File template = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
+        tagTemplate.template = Imgcodecs.imread(template.getAbsolutePath());
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
-        when(taggingConfig.getThreshold()).thenReturn(0.9);
+        when(taggingConfig.getThreshold()).thenReturn(0.99);
 
         taggingService.initTemplates();
         File file = new File(System.getProperty("user.dir"), "src/test/docs/test.png");
@@ -61,13 +61,14 @@ public class TaggingServiceTests {
     }
 
     @Test
-    public void positiveMatchPDF() throws IOException {
+    public void positiveMatchPDF() {
         TagTemplate tagTemplate = new TagTemplate();
-        tagTemplate.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template.png"));
+        File template = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
+        tagTemplate.template = Imgcodecs.imread(template.getAbsolutePath());
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
-        when(taggingConfig.getThreshold()).thenReturn(0.9);
+        when(taggingConfig.getThreshold()).thenReturn(0.91);
 
         taggingService.initTemplates();
         File file = new File(System.getProperty("user.dir"), "src/test/docs/test.pdf");
@@ -77,13 +78,15 @@ public class TaggingServiceTests {
     }
 
     @Test
-    public void pickTheBest() throws IOException {
+    public void pickTheBest() {
         TagTemplate tagTemplateOne = new TagTemplate();
-        tagTemplateOne.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template.png"));
+        File templateGood = new File(System.getProperty("user.dir"), "src/test/docs/template.png");
+        tagTemplateOne.template = Imgcodecs.imread(templateGood.getAbsolutePath());
         tagTemplateOne.name = "goodTag";
 
         TagTemplate tagTemplateTwo = new TagTemplate();
-        tagTemplateTwo.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png"));
+        File templateBad = new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png");
+        tagTemplateTwo.template = Imgcodecs.imread(templateBad.getAbsolutePath());
         tagTemplateTwo.name = "badTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplateOne, tagTemplateTwo));
@@ -97,13 +100,14 @@ public class TaggingServiceTests {
     }
 
     @Test
-    public void negativeMatchExpectedDimensions() throws IOException {
+    public void negativeMatchExpectedDimensions() {
         TagTemplate tagTemplate = new TagTemplate();
-        tagTemplate.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png"));
+        File template = new File(System.getProperty("user.dir"), "src/test/docs/template_bad.png");
+        tagTemplate.template = Imgcodecs.imread(template.getAbsolutePath());
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
-        when(taggingConfig.getThreshold()).thenReturn(0.35);
+        when(taggingConfig.getThreshold()).thenReturn(0.32);
 
         taggingService.initTemplates();
         File file = new File(System.getProperty("user.dir"), "src/test/docs/test.pdf");
@@ -113,9 +117,10 @@ public class TaggingServiceTests {
     }
 
     @Test
-    public void negativeMatchMismatchedDimensions() throws IOException {
+    public void negativeMatchMismatchedDimensions() {
         TagTemplate tagTemplate = new TagTemplate();
-        tagTemplate.template = ImageUtilities.readF(new File(System.getProperty("user.dir"), "src/test/docs/template_bad_big.png"));
+        File template = new File(System.getProperty("user.dir"), "src/test/docs/template_bad_big.png");
+        tagTemplate.template = Imgcodecs.imread(template.getAbsolutePath());
         tagTemplate.name = "myTag";
 
         when(tagTemplateRepository.findAll()).thenReturn(Arrays.asList(tagTemplate));
@@ -126,5 +131,32 @@ public class TaggingServiceTests {
         Set<FileEntry.Tag> tags = taggingService.tag(file, "application/pdf");
 
         Assertions.assertThat(tags).doesNotContain(new FileEntry.Tag("myTag", 0.0));
+    }
+
+    @Test
+    public void mergeTags() {
+        FileEntry.Tag tagOne = new FileEntry.Tag("testOne", 0.1);
+        FileEntry.Tag tagTwo = new FileEntry.Tag("testTwo", 0.2);
+        FileEntry.Tag tagThree = new FileEntry.Tag("testOne", 0.3);
+        FileEntry.Tag tagFour = new FileEntry.Tag("testFour", 0.4);
+
+        Set<FileEntry.Tag> setOne = new HashSet<>();
+        setOne.add(tagOne);
+        setOne.add(tagTwo);
+        setOne.add(tagThree);
+
+        Set<FileEntry.Tag> setTwo = new HashSet<>();
+        setTwo.add(tagThree);
+        setTwo.add(tagFour);
+
+        Set<FileEntry.Tag> setThree = TaggingService.merge(setOne, setTwo);
+
+        Assertions.assertThat(setThree.size()).isEqualTo(3);
+
+        Map<String, Double> mapThree = new HashMap<>();
+        for(FileEntry.Tag tag : setThree) mapThree.put(tag.name, tag.score);
+
+        Assertions.assertThat(mapThree).containsOnlyKeys("testOne", "testTwo", "testFour");
+        Assertions.assertThat(mapThree.get("testOne")).isEqualTo(0.3);
     }
 }
