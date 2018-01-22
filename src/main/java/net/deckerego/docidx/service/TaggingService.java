@@ -28,6 +28,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -101,7 +102,11 @@ public class TaggingService {
     public void submit(Collection<Path> files) {
         LOG.debug(String.format("Submitting tagging of %s", files));
         for (Path file : files) {
-            FileEntry document = this.documentRepository.findByFilename(file.getParent().toString(), file.getFileName().toString());
+            Path rootPath = Paths.get(crawlerConfig.getRootPath());
+            Path parentPath = rootPath.relativize(file.getParent());
+
+            FileEntry document = this.documentRepository.findByFilename(parentPath.toString(), file.getFileName().toString());
+
             this.workBroker.publish(new TaggingTask(document));
         }
     }
