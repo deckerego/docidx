@@ -23,11 +23,21 @@ way to go, but if you would like to tweak the code and run it locally you will
 need to jump through some hoops to install the native libs.
 
 docidx uses bindings for OpenCV and Tesseract native libraries. The OpenCV
-libraries are especially version-sensitive. To install these native binaries in
-MacOS you can use Homebrew, as in:
+libraries are especially version-sensitive. To install the native Tessearact libriaries
+in MacOS you can use Homebrew, as in:
 
     brew install tesseract
-    brew install --build-from-source ./lib/opencv.rb
+
+Unfortunately OpenCV 3.2 does not build properly under Homebrew. For MacOS, 
+OpenCV needs to be built from source. This can be done with:
+
+    wget https://github.com/opencv/opencv/archive/3.2.0.tar.gz
+    tar xzf 3.2.0.tar.gz
+    mkdir opencv-3.2.0/build
+    cd opencv-3.2.0/build
+    cmake .. -DBUILD_opencv_java=ON
+    make
+    make install
 
 Linux distributions often ship with Tesseract and OpenCV 3.2, such as with
 Ubuntu (Bionic):

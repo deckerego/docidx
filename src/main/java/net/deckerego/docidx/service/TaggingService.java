@@ -5,7 +5,6 @@ import net.deckerego.docidx.configuration.TaggingConfig;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.TagTemplate;
 import net.deckerego.docidx.model.TaggingTask;
-import net.deckerego.docidx.model.TikaTask;
 import net.deckerego.docidx.repository.DocumentRepository;
 import net.deckerego.docidx.repository.TagTemplateRepository;
 import net.deckerego.docidx.util.WorkBroker;
@@ -30,7 +29,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Service
@@ -69,9 +67,8 @@ public class TaggingService {
             File relativeFile = new File(task.document.parentPath, task.document.fileName);
             File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
             LOG.info(String.format("Starting tagging %s", relativeFile.toString()));
-            Set<FileEntry.Tag> tags = this.tag(absoluteFile, contentType);
 
-            task.document.tags =  merge(task.document.tags, tags);
+            task.document.tags =  this.tag(absoluteFile, contentType);
             task.document.indexUpdated = Calendar.getInstance().getTime();
 
             LOG.info(String.format("Completed tagging %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
@@ -145,29 +142,6 @@ public class TaggingService {
         }
 
         return tags;
-    }
-
-    public static Set<FileEntry.Tag> merge(Set<FileEntry.Tag> setOne, Set<FileEntry.Tag> setTwo) {
-        Set<FileEntry.Tag> mergedSet = mergeLeft(setOne, setTwo);
-        mergedSet.addAll(mergeLeft(setTwo, setOne));
-        return mergedSet;
-    }
-
-    private static Set<FileEntry.Tag> mergeLeft(Set<FileEntry.Tag> setOne, Set<FileEntry.Tag> setTwo) {
-        Set<FileEntry.Tag> setNew = new HashSet<>();
-
-        Map<String, Double> mapTwo = new HashMap<>();
-        for (FileEntry.Tag tag : setTwo) mapTwo.put(tag.name, tag.score);
-        for(FileEntry.Tag tag : setOne) {
-            if(mapTwo.containsKey(tag.name)) {
-                double highScore = Math.max(tag.score, mapTwo.get(tag.name));
-                setNew.add(new FileEntry.Tag(tag.name, highScore));
-            } else {
-                setNew.add(tag);
-            }
-        }
-
-        return setNew;
     }
 
     private double templateScore(Mat template, Mat image) {
