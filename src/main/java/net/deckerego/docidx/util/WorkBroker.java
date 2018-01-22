@@ -83,7 +83,7 @@ public class WorkBroker {
 
     public void waitUntilComplete() throws InterruptedException {
         while(this.taskCount() > 0) {
-            Thread.sleep(100);
+            Thread.sleep(1000);
         }
     }
 

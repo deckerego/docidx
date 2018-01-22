@@ -1,25 +1,61 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
 import net.deckerego.docidx.model.FileEntry;
+import net.deckerego.docidx.model.TaggingTask;
+import net.deckerego.docidx.model.ThumbnailTask;
+import net.deckerego.docidx.model.TikaTask;
+import net.deckerego.docidx.repository.DocumentRepository;
+import net.deckerego.docidx.util.WorkBroker;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import javax.imageio.ImageIO;
 import java.awt.geom.AffineTransform;
 import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.function.Consumer;
 
 @Service
 public class ThumbnailService {
     private static final Logger LOG = LoggerFactory.getLogger(ThumbnailService.class);
 
-    BufferedImage render(File file, String type, float scale) {
+    @Autowired
+    public WorkBroker workBroker;
+
+    @Autowired
+    public CrawlerConfig crawlerConfig;
+
+
+    @PostConstruct
+    public void initBroker() {
+        this.workBroker.handle(ThumbnailTask.class, task -> {
+            long startTime = System.currentTimeMillis();
+
+            String contentType = task.document.metadata.getOrDefault("Content-Type", "application/octet-stream");
+            File relativeFile = new File(task.document.parentPath, task.document.fileName);
+            File absoluteFile = new File(crawlerConfig.getRootPath(), relativeFile.getPath());
+            LOG.info(String.format("Starting thumbnail rendering %s", relativeFile.toString()));
+            task.document.thumbnail = this.render(absoluteFile, contentType, 0.5F);
+            task.document.indexUpdated = Calendar.getInstance().getTime();
+
+            LOG.info(String.format("Completed thumbnail rendering %s in %d seconds", task.document.fileName, (System.currentTimeMillis() - startTime) / 1000));
+            workBroker.publish(new TaggingTask(task.document));
+        });
+    }
+
+    public BufferedImage render(File file, String type, float scale) {
         BufferedImage image;
 
         try {

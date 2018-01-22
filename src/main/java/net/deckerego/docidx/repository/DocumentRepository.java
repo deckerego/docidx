@@ -11,4 +11,7 @@ import org.springframework.stereotype.Repository;
 public interface DocumentRepository extends ElasticsearchRepository<FileEntry, String> {
     @Query("{\"bool\": {\"must\": [{\"match\": {\"parentPath\": \"?0\"}}]}}")
     Page<FileEntry> findByParentPath(String parentPath, Pageable pageable);
+
+    @Query("{\"bool\": {\"must\": [{\"match\": {\"parentPath\": \"?0\"}}, {\"match\": {\"fileName\": \"?1\"}}]}}")
+    FileEntry findByFilename(String parentPath, String filename);
 }

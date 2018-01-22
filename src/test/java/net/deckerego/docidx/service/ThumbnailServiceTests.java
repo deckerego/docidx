@@ -1,10 +1,14 @@
 package net.deckerego.docidx.service;
 
+import net.deckerego.docidx.configuration.CrawlerConfig;
+import net.deckerego.docidx.repository.DocumentRepository;
+import net.deckerego.docidx.util.WorkBroker;
 import org.assertj.core.api.Assertions;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import java.awt.image.BufferedImage;
@@ -12,10 +16,16 @@ import java.io.File;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest(classes = ThumbnailService.class)
-public class ThumbnailServiceTest {
+public class ThumbnailServiceTests {
 
     @Autowired
     private ThumbnailService thumbSvc;
+
+    @MockBean
+    private WorkBroker workBroker;
+
+    @MockBean
+    private CrawlerConfig crawlerConfig;
 
     @Test
     public void pdf() {

@@ -6,6 +6,7 @@ import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
 import net.deckerego.docidx.repository.DocumentRepository;
+import net.deckerego.docidx.repository.IndexStatsRepository;
 import net.deckerego.docidx.util.WorkBroker;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -39,6 +40,12 @@ public class CrawlerServiceTests {
 
     @MockBean
     private WorkBroker workBroker;
+
+    @MockBean
+    private IndexStatsRepository indexStatsRepository;
+
+    @MockBean
+    private TaggingService taggingService;
 
     @Autowired
     private CrawlerService crawlerService;
@@ -98,7 +105,7 @@ public class CrawlerServiceTests {
         files.put(addition01.getFileName().toString(), addition01);
         files.put(existing02.getFileName().toString(), existing02);
 
-        DocumentActions actions = crawlerService.merge(parent, documents, files);
+        DocumentActions actions = crawlerService.merge(parent, documents, files, false);
 
         assertThat(actions).isNotNull();
         assertThat(actions.additions.size()).isEqualTo(1);
@@ -124,7 +131,7 @@ public class CrawlerServiceTests {
 
         Map<String, Path> files = new HashMap<>();
 
-        DocumentActions actions = crawlerService.merge(parent, documents, files);
+        DocumentActions actions = crawlerService.merge(parent, documents, files, false);
 
         assertThat(actions).isNotNull();
         assertThat(actions.additions.size()).isEqualTo(0);
@@ -157,7 +164,7 @@ public class CrawlerServiceTests {
         Map<String, Path> files = new HashMap<>();
         files.put(existing02.getFileName().toString(), existing02);
 
-        DocumentActions actions = crawlerService.merge(parent, documents, files);
+        DocumentActions actions = crawlerService.merge(parent, documents, files, false);
 
         assertThat(actions).isNotNull();
         assertThat(actions.additions.size()).isEqualTo(0);
@@ -179,7 +186,7 @@ public class CrawlerServiceTests {
         Map<String, Path> files = new HashMap<>();
         files.put(addition01.getFileName().toString(), addition01);
 
-        DocumentActions actions = crawlerService.merge(parent, documents, files);
+        DocumentActions actions = crawlerService.merge(parent, documents, files, false);
 
         assertThat(actions).isNotNull();
         assertThat(actions.updates.size()).isEqualTo(0);

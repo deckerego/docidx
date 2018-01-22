@@ -40,7 +40,7 @@ public class TikaServiceTests {
     public void submitFiles() {
         when(crawlerConfig.getRootPath()).thenReturn(".");
         Path[] files = { Paths.get("./README.md") };
-        this.tikaSvc.submit(Arrays.asList(files), e -> assertThat(e).isNotNull());
+        this.tikaSvc.submit(Arrays.asList(files));
         then(this.workBroker).should().publish(any(TikaTask.class));
     }
 }

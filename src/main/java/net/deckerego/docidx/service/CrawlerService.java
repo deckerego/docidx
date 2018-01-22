@@ -6,6 +6,7 @@ import net.deckerego.docidx.model.DocumentActions;
 import net.deckerego.docidx.model.FileEntry;
 import net.deckerego.docidx.model.ParentEntry;
 import net.deckerego.docidx.repository.DocumentRepository;
+import net.deckerego.docidx.repository.IndexStatsRepository;
 import net.deckerego.docidx.util.WorkBroker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,22 +32,30 @@ public class CrawlerService {
     private static final Logger LOG = LoggerFactory.getLogger(CrawlerService.class);
 
     @Autowired
-    public CrawlerConfig crawlerConfig;
+    private CrawlerConfig crawlerConfig;
 
     @Autowired
-    public ElasticConfig elasticConfig;
+    private ElasticConfig elasticConfig;
 
     @Autowired
-    public TikaService tikaService;
+    private TikaService tikaService;
 
     @Autowired
-    public DocumentRepository documentRepository;
+    private TaggingService taggingService;
 
     @Autowired
-    public WorkBroker workBroker;
+    private IndexStatsRepository indexStatsRepository;
 
+    @Autowired
+    private DocumentRepository documentRepository;
+
+    @Autowired
+    private WorkBroker workBroker;
+
+    private long lastIndexUpdate;
     private AtomicLong addCount = new AtomicLong(0);
     private AtomicLong modCount = new AtomicLong(0);
+    private AtomicLong unmodCount = new AtomicLong(0);
     private AtomicLong delCount = new AtomicLong(0);
 
     @PostConstruct
@@ -55,13 +64,31 @@ public class CrawlerService {
         this.workBroker.handle(ParentEntry.class, this::routeFiles);
     }
 
+    @PostConstruct
+    public void initLastUpdated() {
+        Date latestDoc = indexStatsRepository.documentLastUpdated();
+        this.lastIndexUpdate = latestDoc != null ? latestDoc.getTime() : 0L;
+        LOG.info(String.format("Starting new document run as of %tc", latestDoc));
+    }
+
     public void crawl() {
         //Reset our diagnostic counters
         this.addCount.set(0L);
         this.modCount.set(0L);
+        this.unmodCount.set(0L);
         this.delCount.set(0L);
 
+        //Determine last time the template database was updated
+        Date latestTemplate = indexStatsRepository.tagTemplateLastUpdated();
+        long lastTagUpdate = latestTemplate != null ? latestTemplate.getTime() : 0L;
+        LOG.debug(String.format("Last tag update %tc, last index run %tc", latestTemplate, new Date(this.lastIndexUpdate)));
+
+        //TODO I'm not a big fan of this state being preserved, figure out a better way
+        if(this.lastIndexUpdate <= lastTagUpdate) taggingService.initTemplates();
+        else taggingService.reuseTemplates();
+
         //Walk the given directory and issue ParentEntry messages for later processing
+        this.lastIndexUpdate = System.currentTimeMillis();
         Path cwd = Paths.get(crawlerConfig.getRootPath());
         try {
             Files.walkFileTree(cwd, new SimpleFileVisitor<Path>() {
@@ -146,8 +173,8 @@ public class CrawlerService {
         return document.lastModified.before(fileLastModified);
     }
 
-    public DocumentActions merge(Path parent, Map<String, FileEntry> documents, Map<String, Path> files) {
-        DocumentActions actions = new DocumentActions(parent);
+    public DocumentActions merge(Path parent, Map<String, FileEntry> documents, Map<String, Path> files, boolean updateTags) {
+        DocumentActions actions = new DocumentActions(parent, updateTags);
 
         actions.additions = files.keySet().stream()
                 .filter(f -> ! documents.containsKey(f))
@@ -161,6 +188,12 @@ public class CrawlerService {
         modCount.addAndGet(actions.updates.size());
         LOG.debug(String.format("Found %d updates for %s", actions.updates.size(), parent.getFileName().toString()));
 
+        actions.unmodified = files.keySet().stream()
+                .filter(f -> documents.containsKey(f) && ! isBefore(documents.get(f), files.get(f)))
+                .map(files::get).collect(Collectors.toSet());
+        unmodCount.addAndGet(actions.unmodified.size());
+        LOG.debug(String.format("Found %d unmodified for %s", actions.unmodified.size(), parent.getFileName().toString()));
+
         actions.deletions = documents.keySet().stream()
                 .filter(f -> ! files.containsKey(f))
                 .map(documents::get).collect(Collectors.toSet());
@@ -173,26 +206,18 @@ public class CrawlerService {
     private void routeFiles(ParentEntry parent) {
         CompletableFuture<Map<String, FileEntry>> futureDocuments = CompletableFuture.supplyAsync(() -> getDocuments(parent.directory));
         CompletableFuture<Map<String, Path>> futureFiles = CompletableFuture.supplyAsync(() -> getFiles(parent.directory));
-        CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p));
+        CompletableFuture<DocumentActions> futureEntries = futureDocuments.thenCombine(futureFiles, (d, p) -> merge(parent.directory, d, p, taggingService.rebuildTagging()));
 
         try {
-            //Send out FileEntry messages for deletion or Path messages for additions/updates
-            futureEntries
-                    .whenComplete((actions, ex) -> {
-                        if (ex != null)
-                            LOG.error(String.format("Error mapping additions for %s", parent.toString()), ex);
-                        else tikaService.submit(actions.additions, workBroker::publish);
-                    })
-                    .whenComplete((actions, ex) -> {
-                        if (ex != null) LOG.error(String.format("Error mapping updates for %s", parent.toString()), ex);
-                        else tikaService.submit(actions.updates, workBroker::publish);
-                    })
-                    .whenComplete((actions, ex) -> {
-                        if (ex != null)
-                            LOG.error(String.format("Error mapping deletions for %s", parent.toString()), ex);
-                        else documentRepository.deleteAll(actions.deletions);
-                    })
-                    .get(); // I just like the composition.
+            futureEntries //Submit new document
+                    .whenComplete((actions, ex) -> tikaService.submit(actions.additions))
+                    .whenComplete((actions, ex) -> tikaService.submit(actions.updates))
+                    .whenComplete((actions, ex) -> documentRepository.deleteAll(actions.deletions))
+                    .get();
+
+            futureEntries //Submit re-tagging work
+                    .whenComplete((actions, ex) -> { if(actions.matchTagging) taggingService.submit(actions.unmodified); })
+                    .get();
         } catch(InterruptedException e) {
             LOG.error(String.format("Interrupted while routing files for %s", parent.toString()), e);
         } catch(ExecutionException e) {
@@ -202,5 +227,6 @@ public class CrawlerService {
 
     public long getAddCount() { return this.addCount.get(); }
     public long getModCount() { return this.modCount.get(); }
+    public long getUnmodCount() { return this.unmodCount.get(); }
     public long getDelCount() { return this.delCount.get(); }
 }
