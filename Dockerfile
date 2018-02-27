@@ -3,7 +3,7 @@ FROM ubuntu:bionic
 MAINTAINER john@deckerego.net
 
 # Install DocIndex
-ARG DOCIDX_VERSION=0.3.2
+ARG DOCIDX_VERSION=0.4.0
 ADD target/docidx-${DOCIDX_VERSION}.jar /opt/docidx/docidx.jar
 
 # Install Java and OpenCV
