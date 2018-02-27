@@ -5,7 +5,7 @@
 
 	<groupId>net.deckerego</groupId>
 	<artifactId>docidx</artifactId>
-	<version>0.3.2</version>
+	<version>0.4.0</version>
 	<packaging>jar</packaging>
 
 	<name>DocIndex</name>
@@ -83,6 +83,12 @@
     </dependencies>
 
 	<build>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+			</resource>
+		</resources>
+
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
