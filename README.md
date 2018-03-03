@@ -47,7 +47,7 @@ Ubuntu (Bionic):
 After the native libraries are installed, building and testing can be performed
 locally with Maven and Spring Boot:
 
-    mvn spring-boot:run
+    mvn -DargLine="-Djava.library.path=/usr/local/share/OpenCV/java/" install
 
 If you would also like to spin up a local Elasticsearch and Kibana instance for
 testing, you can deploy both with Docker configs in the `tests/` directory:
