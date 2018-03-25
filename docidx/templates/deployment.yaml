@@ -47,7 +47,7 @@ spec:
       volumes:
       - name: {{ template "docidx.fullname" . }}
         persistentVolumeClaim:
-          claimName: {{ template "docmag.fullname" . }}
+          claimName: {{ template "docidx.fullname" . }}
           readOnly: true
     {{- with .Values.nodeSelector }}
       nodeSelector:
