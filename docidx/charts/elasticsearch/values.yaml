@@ -14,13 +14,13 @@ service:
   port: 9200
 
 jvm:
-  ms: "800M"
-  mx: "800M"
+  ms: "1024M"
+  mx: "1024M"
 
 resources:
   requests:
     cpu: "1000m"
-    memory: "1Gi"
+    memory: "1536Mi"
 
 volumes:
   esdata01:
