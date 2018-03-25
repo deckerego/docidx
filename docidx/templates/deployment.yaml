@@ -40,9 +40,6 @@ spec:
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         resources:
 {{ toYaml .Values.resources | indent 12 }}
-    {{- with .Values.nodeSelector }}
-{{ toYaml . | indent 8 }}
-    {{- end }}
         volumeMounts:
         - mountPath: /usr/share/docidx/docs
           name: {{ template "docidx.fullname" . }}
@@ -52,7 +49,10 @@ spec:
         persistentVolumeClaim:
           claimName: {{ template "docmag.fullname" . }}
           readOnly: true
+    {{- with .Values.nodeSelector }}
       nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
     {{- with .Values.affinity }}
       affinity:
 {{ toYaml . | indent 8 }}

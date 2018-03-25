@@ -49,18 +49,18 @@ spec:
             periodSeconds: 10
           resources:
 {{ toYaml .Values.resources | indent 12 }}
+          volumeMounts:
+          - mountPath: /usr/share/elasticsearch/data
+            name: {{ template "elasticsearch.fullname" . }}
+      volumes:
+      - name: {{ template "elasticsearch.fullname" . }}
+        persistentVolumeClaim:
+          claimName: {{ template "elasticsearch.fullname" . }}
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
     {{- end }}
     {{- with .Values.affinity }}
-        volumeMounts:
-        - mountPath: /usr/share/elasticsearch/data
-          name: {{ template "elasticsearch.fullname" . }}
-      volumes:
-      - name: {{ template "elasticsearch.fullname" . }}
-        persistentVolumeClaim:
-          claimName: {{ template "elasticsearch.fullname" . }}
       affinity:
 {{ toYaml . | indent 8 }}
     {{- end }}
