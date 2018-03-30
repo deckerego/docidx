@@ -42,13 +42,22 @@ spec:
 {{ toYaml .Values.resources | indent 12 }}
         volumeMounts:
         - mountPath: /usr/share/docidx/docs
-          name: {{ template "docidx.fullname" . }}
+          name: {{ template "docidx.fullname" . }}-files
+          readOnly: true
+        - mountPath: /opt/docidx/config
+          name: {{ template "docidx.fullname" . }}-config
           readOnly: true
       volumes:
-      - name: {{ template "docidx.fullname" . }}
+      - name: {{ template "docidx.fullname" . }}-files
         persistentVolumeClaim:
           claimName: {{ template "docidx.fullname" . }}
           readOnly: true
+      - name: {{ template "docidx.fullname" . }}-config
+        configMap:
+          name: {{ template "docidx.fullname" . }}
+          items:
+          - key: application.properties
+            path: application.properties
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
