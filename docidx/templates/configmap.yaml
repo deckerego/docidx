@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "docidx.fullname" . }}
+  labels:
+    app: {{ template "docidx.name" . }}
+    chart: {{ template "docidx.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+data:
+  application.properties: |
+    tagging.threshold=0.5
+    crawler.skipHidden=true
+    parser.ocrTimeoutSeconds=300
+    broker.poolThreads=2
