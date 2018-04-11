@@ -1,10 +1,11 @@
 FROM ubuntu:bionic
 
-MAINTAINER john@deckerego.net
+LABEL maintainer="john@deckerego.net"
 
 # Install DocIndex
 ARG JAR_FILE
 ADD target/${JAR_FILE} /opt/docidx/docidx.jar
+RUN mkdir -p /opt/docidx/config
 
 # Install Java and OpenCV
 RUN apt-get --assume-yes update
