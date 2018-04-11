@@ -15,3 +15,18 @@ spec:
   nfs:
     server: nfs.local
     path: "/home/documents"
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: esbackup
+  labels:
+    volume: esbackup
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 40Gi
+  nfs:
+    server: nfs.local
+    path: "/home/backups"

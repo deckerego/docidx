@@ -25,6 +25,8 @@ resources:
 volumes:
   esdata01:
     storage: 10Gi
+  esbackup:
+    storage: 40Gi
 
 nodeSelector: {}
 
