@@ -1,0 +1,8 @@
+To test the ES healthcheck with kubectl proxy:
+    curl "http://localhost:8001/api/v1/namespaces/default/services/docmag-elasticsearch:http/proxy/_cluster/health"
+
+A backup could be manually executed with kubectl using:
+    curl -X PUT "http://localhost:8001/api/v1/namespaces/default/services/docmag-elasticsearch:http/proxy/_snapshot/docidx_backup_0/snapshot_20180411?wait_for_completion=true" -H "Content-Type: application/json"
+
+And a manual restore can be performed with:
+    curl -X POST "http://localhost:8001/api/v1/namespaces/default/services/docmag-elasticsearch:http/proxy/_snapshot/docidx_backup_0/snapshot_20180411/_restore" -H "Content-Type: application/json"
