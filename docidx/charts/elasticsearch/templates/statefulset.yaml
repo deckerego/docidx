@@ -1,5 +1,5 @@
 apiVersion: apps/v1beta2
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ template "elasticsearch.fullname" . }}
   labels:
@@ -52,10 +52,8 @@ spec:
           volumeMounts:
           - mountPath: /usr/share/elasticsearch/data
             name: {{ template "elasticsearch.fullname" . }}
-      volumes:
-      - name: {{ template "elasticsearch.fullname" . }}
-        persistentVolumeClaim:
-          claimName: {{ template "elasticsearch.fullname" . }}
+          - mountPath: /usr/share/elasticsearch/backups
+            name: {{ template "elasticsearch.fullname" . }}-backup
     {{- with .Values.nodeSelector }}
       nodeSelector:
 {{ toYaml . | indent 8 }}
@@ -68,3 +66,36 @@ spec:
       tolerations:
 {{ toYaml . | indent 8 }}
     {{- end }}
+  volumeClaimTemplates:
+  - metadata:
+      name: {{ template "elasticsearch.fullname" . }}
+      labels:
+        app: {{ template "elasticsearch.name" . }}
+        chart: {{ template "elasticsearch.chart" . }}
+        release: {{ .Release.Name }}
+        heritage: {{ .Release.Service }}
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: {{ .Values.volumes.esdata01.storage }}
+      selector:
+        matchLabels:
+          volume: esdata01
+  - metadata:
+      name: {{ template "elasticsearch.fullname" . }}-backup
+      labels:
+        app: {{ template "elasticsearch.name" . }}
+        chart: {{ template "elasticsearch.chart" . }}
+        release: {{ .Release.Name }}
+        heritage: {{ .Release.Service }}
+    spec:
+      accessModes:
+      - ReadWriteMany
+      resources:
+        requests:
+          storage: {{ .Values.volumes.esbackup.storage }}
+      selector:
+        matchLabels:
+          volume: esbackup

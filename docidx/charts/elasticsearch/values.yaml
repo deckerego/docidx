@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: deckerego/elasticsearch
-  tag: 5.6.4
+  tag: 5.6.8
   pullPolicy: IfNotPresent
 
 transport:
@@ -25,6 +25,8 @@ resources:
 volumes:
   esdata01:
     storage: 10Gi
+  esbackup:
+    storage: 40Gi
 
 nodeSelector: {}
 

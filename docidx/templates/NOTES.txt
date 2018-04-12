@@ -1,0 +1,30 @@
+To use Helm to install DocIndex, you first need to have two
+persistent volumes defined:
+1. scanneddoc - The shared volume where all the scanned documents reside
+2. esbackup - A shared volume for search index backups
+
+
+If you do not have these persistent volumes defined in your Kubernetes cluster,
+create a file named document-volumes.yaml that contains the definition a shared
+volume to use. An example with NFS might be:
+
+    apiVersion: v1
+    kind: PersistentVolume
+    metadata:
+      name: scanneddoc
+      labels:
+        volume: scanneddoc
+    spec:
+      accessModes:
+      - ReadOnlyMany
+      capacity:
+        storage: 400Gi
+      nfs:
+        server: nfs.local
+        path: "/home/documents"
+
+After defining the volume, deploy document-volumes.yaml using
+`kubectl apply -f document-volumes.yaml`
+
+You will need a similar volume defined for your backups - repeat the same steps
+to build a persistent volume named "esbackup."
