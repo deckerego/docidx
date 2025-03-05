@@ -1,5 +1,7 @@
 # DocIndex
 
+**--> DocMag and DocIndex have been retired - take a look at [Paperless-ngx](https://docs.paperless-ngx.com/) as a replacement. <--**
+
 DocIndex is the batch process used to feed DocMag, a front-end to Elasticsearch
 that allows server-side document searching to be simple.
 
